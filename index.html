@@ -111,10 +111,14 @@ main:focus{outline:none}
 .row.center{justify-content:center}
 .linkbtn{background:none;border:0;padding:4px 2px;color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:3px}
 .linkbtn:hover{color:var(--ink)}
-.key{min-width:36px;height:36px;padding:0 6px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:16px var(--f-cz)}
+.key{min-width:36px;height:36px;padding:0 6px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:16px var(--f-cz);touch-action:manipulation}
 .key:hover{border-color:var(--blue)}
-.key.shift{min-width:46px;font:600 13px var(--f-body)}
+.key.shift{display:inline-grid;place-items:center;min-width:46px}
+.key.shift .ic{width:18px;height:18px}
+.key.shift .bar{visibility:hidden}
 .key.shift[aria-pressed="true"]{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+.key.shift.lock .arrow{fill:currentColor}
+.key.shift.lock .bar{visibility:visible}
 
 /* ---------- grammar ---------- */
 .toc{display:flex;flex-wrap:wrap;gap:6px;margin:24px 0 4px}
@@ -2862,6 +2866,7 @@ const ICON={
   check:svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>',2.4),
   cross:svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',2.4),
   speak:svg('<path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>',2),
+  shift:svg('<path class="arrow" d="M12 4 4.5 11.5H9V17h6v-5.5h4.5z"/><path class="bar" d="M9 20.5h6"/>',2),
   chev:svg('<path d="M9.5 6l6 6-6 6"/>',2.2)
 };
 const live=$('#live');
@@ -3292,16 +3297,27 @@ const Grammar=(()=>{
   return {render,refresh};
 })();
 
-// floating diacritics bar for grammar answers
-const kbd=$('#kbd');let upper=false,kbdTarget=null;
+// diacritic keys: the floating bar for grammar answers and the row under the word trainer's input
+const kbd=$('#kbd');let kbdTarget=null;
 const CH='á č ď é ě í ň ó ř š ť ú ů ý ž'.split(' ');
-function drawKbd(){
-  kbd.innerHTML='';
-  CH.forEach(c=>{const b=el('button','key',upper?c.toUpperCase():c);b.type='button';b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>insertAt(kbdTarget,b.textContent));kbd.appendChild(b)});
-  const s=el('button','key shift','Aa');s.type='button';s.title='Заглавные буквы';s.setAttribute('aria-label','Заглавные буквы');s.setAttribute('aria-pressed',String(upper));
-  s.addEventListener('mousedown',e=>e.preventDefault());s.addEventListener('click',()=>{upper=!upper;drawKbd();$('.shift',kbd).focus({preventScroll:true})});
-  kbd.appendChild(s);
+// shift as on a phone: a tap makes the next letter capital, a double tap keeps capitals on, Shift held on a real keyboard works too
+let shift=0,shiftAt=0; // 0 off, 1 next letter, 2 locked
+const keyChar=(c,e)=>shift||(e&&e.shiftKey)?c.toUpperCase():c;
+const SHIFT_TIP=['Заглавная буква. Двойное нажатие — все заглавные','Следующая буква заглавная','Все буквы заглавные'];
+const keysHTML=act=>CH.map(c=>`<button type="button" class="key"${act?` data-act="${act}"`:''} data-c="${c}">${keyChar(c)}</button>`).join('')
+  +`<button type="button" class="key shift${shift===2?' lock':''}"${act?' data-act="shift"':''} aria-pressed="${!!shift}" aria-label="${SHIFT_TIP[shift]}" title="${SHIFT_TIP[shift]}">${ICON.shift}</button>`;
+function setShift(v){
+  shift=v;
+  $$('.key[data-c]').forEach(b=>{b.textContent=keyChar(b.dataset.c)});
+  $$('.key.shift').forEach(b=>{b.classList.toggle('lock',v===2);b.setAttribute('aria-pressed',String(!!v));b.setAttribute('aria-label',SHIFT_TIP[v]);b.title=SHIFT_TIP[v]});
 }
+function tapShift(){const t=Date.now();setShift(shift===1&&t-shiftAt<450?2:shift?0:1);shiftAt=t}
+function typeKey(inp,c,e){if(!inp||!inp.isConnected)return;insertAt(inp,keyChar(c,e));if(shift===1)setShift(0)}
+// a letter typed on the device keyboard uses up a one-letter shift as well
+document.addEventListener('input',e=>{if(shift===1&&e.target.matches&&e.target.matches('input.ans,#wr-input'))setShift(0)});
+function drawKbd(){kbd.innerHTML=keysHTML()}
+kbd.addEventListener('mousedown',e=>{if(e.target.closest('.key'))e.preventDefault()});
+kbd.addEventListener('click',e=>{const b=e.target.closest('.key');if(!b)return;if(b.dataset.c)typeKey(kbdTarget,b.dataset.c,e);else tapShift()});
 function insertAt(inp,c){
   if(!inp||!inp.isConnected)return;
   const a=inp.selectionStart??inp.value.length,b=inp.selectionEnd??a;
@@ -3324,7 +3340,6 @@ const Words=(()=>{
   const saveUI=()=>store.set(KEYS.words,{v:2,mode:ui.mode,dir:ui.dir,onlyNew:ui.onlyNew,pace:ui.pace});
   saveUI();
   const S={lesson:1,deck:[],pos:0,right:0,wrong:0,total:0,flipped:false,answered:false,busy:false,celebrated:false,filter:'',key:''};
-  const canSpeak=('speechSynthesis' in window)&&typeof SpeechSynthesisUtterance==='function';
   let root=null,stage=null;
 
   // split a Czech entry into the bare word and its grammar notes
@@ -3391,11 +3406,77 @@ const Words=(()=>{
     const s=stripMarks(a);i=fs.findIndex(f=>[...f.acc].some(v=>stripMarks(v)===s));
     return i>=0?{r:1,i,fs}:{r:0,i:0,fs};
   }
-  function speak(t){
-    if(!canSpeak)return;
-    // "Máš/Máte pravdu." is read as its readings, not as a slash
-    const say=forms(t).slice(0,2).map(f=>f.text.replace(/[.…]+$/,'')).join('. ');
-    try{const u=new SpeechSynthesisUtterance(say);u.lang='cs-CZ';u.rate=.9;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
+  // ---------- pronunciation ----------
+  // an entry or one of its forms as plain Czech for a voice: no slashes, endings or grammar notes.
+  // "Máš/Máte pravdu." → Máš pravdu. Máte pravdu. "cestuji/-uju" → cestuji, cestuju; "zakázán, -a, -o" → zakázán, zakázána, zakázáno;
+  // "(si)", "(čas)" are said, "(+ G)", "(F, N)", "(SŠ)", "(např. balík)" are not. The text is also the key of the recorded clip.
+  const NOTE=/^(\+|např\.|[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]{2,3}$|[FMN](,\s*[FMN])*$)/;
+  function spoken(cz){
+    const all=forms(cz).map(f=>f.text),pick=all.length>3?[all[0],all[all.length-1]]:all;
+    return pick.map(t=>{
+      t=t.replace(/(?<=\p{L})\(([^)]*)\)|\(([^)]*)\)(?=\p{L})/gu,'$1$2')
+        .replace(/\s*\(([^)]*)\)/g,(m,c)=>NOTE.test(c.trim())?'':(/^\p{Lu}.*[.?!]$/u.test(c)?'. ':' ')+c)
+        .replace(/…|\.\.\./g,' ').replace(/\s+[–—-]\s+/g,' ');
+      t=t.split(/\s+/).map(tok=>tok.includes('/')?altsOf(tok).join(', '):tok).join(' ');
+      t=t.replace(/(\S+?)((?:,\s*-\p{L}+)+)/gu,(m,base,ends)=>[base,...ends.split(/,\s*/).slice(1).map(e=>e==='-a'?base+'a':swapEnd(base,e.slice(1)))].join(', '));
+      t=t.replace(/\s+([,.?!;])/g,'$1').replace(/,(?=[,.?!])/g,'').replace(/\s{2,}/g,' ').trim();
+      return /[.?!]$/.test(t)?t:t+'.';
+    }).join(' ');
+  }
+  // Recorded clips (Microsoft Vlasta, a neural cs-CZ voice) come one file per lesson, audio/l1.js…l12.js, and fill
+  // window.CZ_AUDIO: spoken text → mp3 in base64. The browser's own voices are often not Czech (Windows ships English
+  // ones), and an English voice reading Czech teaches the wrong sounds, so without a clip only a Czech system voice speaks.
+  const CLIPS=window.CZ_AUDIO=window.CZ_AUDIO||{},clipFiles={};
+  function loadClips(n){
+    return clipFiles[n]||(clipFiles[n]=new Promise(res=>{
+      const s=document.createElement('script');s.src=`audio/l${n}.js`;
+      s.onload=()=>res(true);s.onerror=()=>{delete clipFiles[n];s.remove();res(false)};
+      document.head.appendChild(s);
+    }));
+  }
+  const player=typeof Audio==='function'?new Audio():null,canTTS=('speechSynthesis' in window)&&typeof SpeechSynthesisUtterance==='function';
+  const canSpeak=!!player||canTTS;
+  let czVoice=null,ctx=null,source=null,webAudio=false,sayId=0;
+  function pickVoice(){
+    const vs=speechSynthesis.getVoices().filter(v=>/^cs([-_]|$)/i.test(v.lang));
+    // neural voices first (Edge's «Online (Natural)», Google), then any Czech one
+    czVoice=vs.find(v=>/natural|online/i.test(v.name))||vs.find(v=>/google/i.test(v.name))||vs[0]||null;
+  }
+  if(canTTS){pickVoice();if(speechSynthesis.addEventListener)speechSynthesis.addEventListener('voiceschanged',pickVoice)}
+  function sayTTS(text){
+    if(!canTTS||!czVoice)return false;
+    try{const u=new SpeechSynthesisUtterance(text);u.voice=czVoice;u.lang=czVoice.lang;u.rate=.9;speechSynthesis.cancel();speechSynthesis.speak(u);return true}catch(e){return false}
+  }
+  function hush(){
+    if(player)player.pause();
+    if(source){try{source.stop()}catch(e){}source=null}
+    if(canTTS)speechSynthesis.cancel();
+  }
+  // an <audio> element plays even with the phone on silent; Web Audio is the fallback where a page may not load data: media
+  function playClip(b64,text,id){
+    if(player&&!webAudio){
+      player.src='data:audio/mpeg;base64,'+b64;
+      player.play().catch(e=>{if(e.name==='NotSupportedError'&&id===sayId){webAudio=true;playClip(b64,text,id)}});
+      return;
+    }
+    try{
+      ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();ctx.resume();
+      ctx.decodeAudioData(Uint8Array.from(atob(b64),c=>c.charCodeAt(0)).buffer).then(buf=>{
+        if(id!==sayId)return;
+        source=ctx.createBufferSource();source.buffer=buf;source.connect(ctx.destination);source.start();
+      }).catch(()=>{if(id===sayId)sayTTS(text)});
+    }catch(e){sayTTS(text)}
+  }
+  // n: the lesson the entry comes from (a synonym can come from another one)
+  function speak(cz,n=S.lesson,asked){
+    const text=spoken(cz),id=++sayId;
+    hush();
+    if(CLIPS[text])return playClip(CLIPS[text],text,id);
+    loadClips(n).then(()=>{
+      if(id!==sayId)return;
+      if(CLIPS[text])playClip(CLIPS[text],text,id);
+      else if(!sayTTS(text)&&asked)announce('Озвучка не загрузилась, а чешского голоса в браузере нет');
+    });
   }
 
   const deckKey=()=>[S.lesson,ui.mode,ui.dir,ui.onlyNew].join('|');
@@ -3405,7 +3486,7 @@ const Words=(()=>{
   const speakBtn=()=>canSpeak?`<button type="button" class="speak" data-act="say" aria-label="Произнести по-чешски" title="Произнести по-чешски">${ICON.speak}</button>`:'';
   const writeHTML=(w,hint)=>`<div class="qcard pop-in"><div class="word ru" id="wr-q">${esc(w.ru)}</div><div class="whint">${hint}</div></div>
         <input type="text" class="wr-input" id="wr-input" lang="cs" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="česky…" aria-labelledby="wr-q">
-        <div class="keys" role="group" aria-label="Буквы с диакритикой">${'áčďéěíňóřšťúůýž'.split('').map(c=>`<button type="button" class="key" data-act="key" data-c="${c}">${c}</button>`).join('')}</div>
+        <div class="keys" role="group" aria-label="Буквы с диакритикой">${keysHTML('key')}</div>
         <div class="wfb" aria-live="polite"></div>
         <div class="wbtns"><button type="button" class="btn lg ghost" data-act="skip">Не знаю</button><button type="button" class="btn lg" data-act="check">Проверить <kbd>Enter</kbd></button></div>`;
   // ---------- synonyms: words that mean the same are right answers for each other ----------
@@ -3479,6 +3560,7 @@ const Words=(()=>{
     panel.addEventListener('click',onClick);
     panel.addEventListener('change',onChange);
     panel.addEventListener('mousedown',e=>{if(e.target.closest('.keys .key'))e.preventDefault()});
+    if(canSpeak)loadClips(n); // the lesson's recordings arrive before the first word is said
     enter();
   }
   function enter(){
@@ -3956,7 +4038,7 @@ const Words=(()=>{
     inp.readOnly=true;
     $('[data-act="check"]',stage).innerHTML='Дальше <kbd>Enter</kbd>';$('[data-act="skip"]',stage).hidden=true;
     inp.focus({preventScroll:true});
-    speak(word);
+    speak(word,(from||w).n);
     if(learn)learnTyped(res);
   }
 
@@ -3992,7 +4074,7 @@ const Words=(()=>{
     announce(`Прогресс слов урока ${S.lesson} сброшен`);
     S.key='';enter();
   }
-  function insertChar(c){const i=$('#wr-input',stage);if(i&&!i.readOnly)insertAt(i,c)}
+  function insertChar(c,e){const i=$('#wr-input',stage);if(i&&!i.readOnly)typeKey(i,c,e)}
 
   function onClick(e){
     if(e.target.matches('input'))return;
@@ -4004,9 +4086,10 @@ const Words=(()=>{
       case 'flip':flip();break;
       case 'yes':swipeMark(true);break;
       case 'no':swipeMark(false);break;
-      case 'say':{const w=curWord();if(w)speak(w.cz);break}
+      case 'say':{const w=curWord();if(w)speak(w.cz,w.n,true);break}
       case 'pick':quizPick(+t.dataset.i);break;
-      case 'key':insertChar(t.dataset.c);break;
+      case 'key':insertChar(t.dataset.c,e);break;
+      case 'shift':tapShift();break;
       case 'check':writeCheck(false);break;
       case 'skip':writeCheck(true);break;
       case 'again':start();break;
