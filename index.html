@@ -215,6 +215,12 @@ input.ans:focus{border-color:var(--blue);outline:none;box-shadow:0 0 0 3px var(-
 .gbar b{color:var(--ink);font-weight:600}
 .gbar.done b{color:var(--good)}
 .gbar b .ic{margin-right:5px;vertical-align:-.2em}
+/* «Новые задания»: fresh exercises from the rule's generator, outside the rule's progress */
+.gnewp{margin-top:12px;padding:14px 16px 16px;border-radius:12px;background:var(--blue-soft)}
+.gnewp .exhead h3{font:700 15px/1.3 var(--f-display);color:var(--ink)}
+.gnewp .exhead h3:focus{outline:none}
+.gnewp .exmeta{color:var(--blue-2)}
+.gnewp .row{margin-top:12px}
 .guide{margin-top:12px;padding:18px 20px 20px;border-radius:12px;background:var(--blue-soft)}
 .ghead{display:flex;align-items:baseline;justify-content:space-between;gap:6px 16px}
 .ghead h3{margin:0;font:700 17px/1.3 var(--f-display);text-wrap:balance}
@@ -1167,6 +1173,1462 @@ ${EX('s t[ěmi] nov[ými] studenty','s modern[ími] lidmi')}`,
 x:C('s těmi ___ lidmi','milí|*milými|milých','Instrumentál мн. ч.: -ými.')}
 ]
 };
+</script>
+<script>
+// Task generators: fresh exercises for every grammar rule, keyed by rule id like GUIDES.
+// GEN[ruleId]() returns one exercise shaped like C(), I(), O(), M() build it; an O() task may list other right word orders in alt.
+// The forms come from the tables below. After a change, run: node tools/check-gen.js (from site-slova/).
+const GEN=(()=>{
+// ---------- forms: nouns, adjectives, pronouns, verbs ----------
+const pick=a=>a[Math.random()*a.length|0];
+const mixed=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const some=(a,n)=>mixed(a).slice(0,n);
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const low=s=>s.charAt(0).toLowerCase()+s.slice(1);
+const VOW='aeiouyáéíóúůýě';
+const isV=c=>VOW.includes(c);
+// one form or several right ones, written "a/b"
+const alts=s=>s.split('/');
+
+// the ending -ě / -e after a hard stem: matka → matce, kniha → knize, sestra → sestře, škola → škole
+function palE(st){
+  if(st.endsWith('ch'))return st.slice(0,-2)+'še';
+  const c=st.slice(-1),b=st.slice(0,-1);
+  if(c==='k')return b+'ce';
+  if(c==='h'||c==='g')return b+'ze';
+  if(c==='r')return b+'ře';
+  if('dtnbpvmf'.includes(c))return st+'ě';
+  return st+'e';
+}
+// Mž nominative plural: kluk → kluci, Čech → Češi, bratr → bratři
+function palI(st){
+  if(st.endsWith('ch'))return st.slice(0,-2)+'ši';
+  const c=st.slice(-1),b=st.slice(0,-1);
+  if(c==='k')return b+'ci';
+  if(c==='h'||c==='g')return b+'zi';
+  if(c==='r')return b+'ři';
+  return st+'i';
+}
+// locative plural of hard masculines: parcích, úřednících, Češích
+function locPl(st){
+  if(st.endsWith('ch'))return st.slice(0,-2)+'ších';
+  const c=st.slice(-1),b=st.slice(0,-1);
+  if(c==='k')return b+'cích';
+  if(c==='h'||c==='g')return b+'zích';
+  return st+'ech';
+}
+// zero ending of the genitive plural: kamarádka → kamarádek, okno → oken, město → měst
+function zeroPl(st){
+  const a=st.slice(-2,-1),b=st.slice(-1);
+  if(isV(a)||isV(b)||a+b==='st'||a+b==='sk')return st;
+  return st.slice(0,-1)+'e'+b;
+}
+
+// classes: mh Mž hard (student), ms Mž soft (muž), ih Mn hard (hrad), is Mn soft (stroj),
+// fh F -a (žena), fs F -e/-ě (růže), fc F soft consonant (píseň), fk F -ost (kost),
+// nh Neu -o (město), ns Neu -e (moře), ni Neu -í (stavení)
+const CASES=['N','G','D','A','V','L','I','N2','G2','D2','A2','L2','I2'];
+function decl(nom,cl,ov){
+  const st=ov.st||nom,f={N:nom};
+  const s1=nom.slice(0,-1);
+  if(cl==='mh'){
+    Object.assign(f,{G:st+'a',D:st+'ovi',A:st+'a',L:st+'ovi',I:st+'em',
+      V:/(k|h|g|ch)$/.test(st)?st+'u':/[^aeiouyáéíóúůý]r$/.test(st)?st.slice(0,-1)+'ře':st+'e',
+      N2:palI(st),A2:st+'y',G2:st+'ů',D2:st+'ům',L2:locPl(st),I2:st+'y'});
+  }else if(cl==='ms'){
+    const d=ov.nm?st+'ovi/'+st+'i':st+'i/'+st+'ovi';
+    Object.assign(f,{G:st+'e',D:d,A:st+'e',L:d,I:st+'em',V:st.endsWith('c')?st.slice(0,-1)+'če':st+'i',
+      N2:nom.endsWith('tel')?st+'é':st+'i',A2:st+'e',G2:st+'ů',D2:st+'ům',L2:st+'ích',I2:st+'i'});
+  }else if(cl==='ih'){
+    Object.assign(f,{G:st+'u',D:st+'u',A:nom,L:st+'u',I:st+'em',
+      N2:st+'y',A2:st+'y',G2:st+'ů',D2:st+'ům',L2:locPl(st),I2:st+'y'});
+    if(ov.Le)f.L=palE(st);
+  }else if(cl==='is'){
+    Object.assign(f,{G:st+'e',D:st+'i',A:nom,L:st+'i',I:st+'em',
+      N2:st+'e',A2:st+'e',G2:st+'ů',D2:st+'ům',L2:st+'ích',I2:st+'i'});
+  }else if(cl==='fh'){
+    const t=ov.st||s1;
+    Object.assign(f,{G:t+'y',D:palE(t),A:t+'u',V:t+'o',L:palE(t),I:t+'ou',
+      N2:t+'y',A2:t+'y',G2:/[^aeiouyáéíóúůý]k$/.test(t)?t.slice(0,-1)+'ek':t,D2:t+'ám',L2:t+'ách',I2:t+'ami'});
+  }else if(cl==='fs'){
+    const t=s1,e=nom.endsWith('ě');
+    Object.assign(f,{G:nom,D:t+'i',A:t+'i',V:nom,L:t+'i',I:t+'í',
+      N2:nom,A2:nom,G2:/ic$/.test(t)?t:/yn$/.test(t)?t.slice(0,-1)+'ň':t+'í',D2:t+'ím',L2:t+'ích',I2:t+(e?'ěmi':'emi')});
+  }else if(cl==='fc'){
+    // skříň: skřín-ě, skřín-i; postel: postel-e, postel-i
+    const h={ň:'n',ď:'d',ť:'t'}[st.slice(-1)],b=h?st.slice(0,-1)+h:st,g=b+(h?'ě':'e');
+    Object.assign(f,{G:g,D:b+'i',A:nom,L:b+'i',I:b+'í',N2:g,A2:g,G2:b+'í',D2:b+'ím',L2:b+'ích',I2:g+'mi'});
+  }else if(cl==='fk'){
+    Object.assign(f,{G:nom+'i',D:nom+'i',A:nom,L:nom+'i',I:nom+'í',N2:nom+'i',A2:nom+'i',G2:nom+'í',D2:nom+'em',L2:nom+'ech',I2:nom+'mi'});
+  }else if(cl==='nh'){
+    const t=s1;
+    Object.assign(f,{G:t+'a',D:t+'u',A:nom,V:nom,L:/(k|h|g|ch|r)$/.test(t)?t+'u':palE(t),I:t+'em',
+      N2:t+'a',A2:t+'a',G2:zeroPl(t),D2:t+'ům',L2:t+'ech',I2:t+'y'});
+  }else if(cl==='ns'){
+    const t=s1,e=nom.endsWith('ě');
+    Object.assign(f,{G:nom,D:t+'i',A:nom,L:t+'i',I:t+(e?'ěm':'em'),N2:nom,A2:nom,G2:t+'í',D2:t+'ím',L2:t+'ích',I2:t+'i'});
+  }else if(cl==='ni'){
+    Object.assign(f,{G:nom,D:nom,A:nom,L:nom,I:nom+'m',N2:nom,A2:nom,G2:nom,D2:nom+'m',L2:nom+'ch',I2:nom+'mi'});
+  }
+  CASES.forEach(k=>{if(ov[k])f[k]=ov[k]});
+  const out={};CASES.forEach(k=>{if(f[k])out[k]=alts(f[k])});
+  return out;
+}
+// gender for agreement: mz Mž, mn Mn, f, n
+const GENDER={mh:'mz',ms:'mz',ih:'mn',is:'mn',fh:'f',fs:'f',fc:'f',fk:'f',nh:'n',ns:'n',ni:'n'};
+
+// nom|class|russian|tags|overrides (key=value, «/» separates right variants)
+// tags: p person, a animal, fam family, t thing, fur furniture, food, drink, pl place, city, land, subj school subject, top topic, tr transport, wr writing tool
+const NOUN_SRC=`
+student|mh|студент|p|
+kamarád|mh|друг|p|
+bratr|mh|брат|p fam|
+doktor|mh|врач|p|
+soused|mh|сосед|p|N2=sousedé
+syn|mh|сын|p fam|N2=synové
+dědeček|mh|дедушка|p fam|st=dědečk,N2=dědečkové
+tatínek|mh|папа|p fam|st=tatínk,N2=tatínkové
+kluk|mh|парень|p|
+spolužák|mh|одноклассник|p|
+úředník|mh|чиновник|p|
+Čech|mh|чех|p|
+pán|mh|господин|p|V=pane,N2=páni/pánové
+manžel|mh|муж (супруг)|p fam|V=manželi,N2=manželé
+programátor|mh|программист|p|
+zpěvák|mh|певец|p|
+Petr|mh|Петр|p name|
+Adam|mh|Адам|p name|
+Pavel|mh|Павел|p name|st=Pavl
+Karel|mh|Карел|p name|st=Karl
+Marek|mh|Марек|p name|st=Mark
+Jakub|mh|Якуб|p name|
+Martin|mh|Мартин|p name|
+David|mh|Давид|p name|
+Filip|mh|Филип|p name|
+učitel|ms|учитель|p|
+lékař|ms|врач|p|
+muž|ms|мужчина|p|
+otec|ms|отец|p fam|st=otc,N2=otcové
+cizinec|ms|иностранец|p|st=cizinc
+herec|ms|актёр|p|st=herc
+prodavač|ms|продавец|p|
+přítel|ms|друг|p|D=příteli,L=příteli,N2=přátelé,A2=přátele,G2=přátel,D2=přátelům,L2=přátelích,I2=přáteli
+člověk|mh|человек|p|D=člověku/člověkovi,L=člověku/člověkovi,V=člověče,N2=lidé,A2=lidi,G2=lidí,D2=lidem,L2=lidech,I2=lidmi
+Tomáš|ms|Томаш|p name|nm=1,N2=Tomášové
+Lukáš|ms|Лукаш|p name|nm=1
+Ondřej|ms|Ондржей|p name|nm=1
+studentka|fh|студентка|p|
+kamarádka|fh|подруга|p|
+sestra|fh|сестра|p fam|G2=sester
+učitelka|fh|учительница|p|
+doktorka|fh|врач (женщина)|p|
+babička|fh|бабушка|p fam|
+maminka|fh|мама|p fam|
+matka|fh|мать|p fam|
+žena|fh|женщина|p|
+manželka|fh|жена|p fam|
+dcera|fh|дочь|p fam|
+sousedka|fh|соседка|p|
+spolužačka|fh|одноклассница|p|
+sekretářka|fh|секретарша|p|
+holka|fh|девушка|p|
+Jana|fh|Яна|p name|
+Eva|fh|Ева|p name|
+Alena|fh|Алена|p name|
+Petra|fh|Петра|p name|
+Hana|fh|Гана|p name|
+Lenka|fh|Ленка|p name|
+Tereza|fh|Тереза|p name|
+Lucie|fs|Луция|p name|
+Marie|fs|Мария|p name|
+sestřenice|fs|двоюродная сестра|p fam|
+kolegyně|fs|коллега (женщина)|p|
+dítě|ns|ребёнок|p fam|G=dítěte,D=dítěti,L=dítěti,I=dítětem,N2=děti,A2=děti,G2=dětí,D2=dětem,L2=dětech,I2=dětmi
+pes|mh|собака|a|st=ps,V=pse,N2=psi
+kočka|fh|кошка|a|
+sešit|ih|тетрадь|t|
+stůl|ih|стол|t fur|st=stol,Le=1
+počítač|is|компьютер|t|
+mobil|ih|мобильный|t|
+telefon|ih|телефон|t|
+dům|ih|дом|bld|st=dom,Le=1
+klíč|is|ключ|t|
+dárek|ih|подарок|t|st=dárk
+obraz|ih|картина|t|L=obraze/obrazu
+slovník|ih|словарь|t|
+deštník|ih|зонт|t|
+lístek|ih|билет|t|st=lístk
+dopis|ih|письмо|t|L=dopise/dopisu
+svetr|ih|свитер|t clo|
+kabát|ih|пальто|t clo|L=kabátě/kabátu
+film|ih|фильм|top|
+text|ih|текст|t|
+úkol|ih|задание|t|
+test|ih|тест|t|
+autobus|ih|автобус|tr|L=autobusu/autobuse
+vlak|ih|поезд|tr|
+pokoj|is|комната|room|
+gauč|is|диван|fur|
+most|ih|мост|bld|Le=1
+kniha|fh|книга|t|
+mapa|fh|карта|t|
+taška|fh|сумка|t|
+židle|fs|стул|t fur|
+skříň|fc|шкаф|fur|
+postel|fc|кровать|fur|
+tužka|fh|карандаш|t wr|
+propiska|fh|ручка|t wr|
+lampa|fh|лампа|t fur|
+učebnice|fs|учебник|t|
+fotka|fh|фотография|t|
+sukně|fs|юбка|t clo|
+košile|fs|рубашка|t clo|
+bunda|fh|куртка|t clo|
+čepice|fs|шапка|t clo|
+tabule|fs|доска|t|
+tramvaj|fc|трамвай|tr|
+věc|fk|вещь|t|
+auto|nh|машина|t tr|
+okno|nh|окно|fur|
+kolo|nh|велосипед|t|
+pero|nh|ручка (перо)|t wr|
+jméno|nh|имя|t|
+číslo|nh|число|t|
+slovo|nh|слово|t|
+letadlo|nh|самолёт|tr|
+metro|nh|метро|tr|
+křeslo|nh|кресло|fur|
+tričko|nh|футболка|t clo|L=tričku
+káva|fh|кофе|drink|
+čaj|is|чай|drink|
+voda|fh|вода|drink|
+mléko|nh|молоко|drink|L=mléku/mléce
+pivo|nh|пиво|drink|L=pivu
+víno|nh|вино|drink|
+džus|ih|сок|drink|
+polévka|fh|суп|food|
+zmrzlina|fh|мороженое|food|
+chléb|ih|хлеб|food|st=chleb,G=chleba/chlebu,A=chléb/chleba
+rohlík|ih|рогалик|food|
+sýr|ih|сыр|food|G=sýra/sýru
+salát|ih|салат|food|
+dort|ih|торт|food|
+koláč|is|пирог|food|
+jablko|nh|яблоко|food|L=jablku,L2=jablkách
+banán|ih|банан|food|
+maso|nh|мясо|food|
+ryba|fh|рыба|food|
+zelenina|fh|овощи|food|
+cukr|ih|сахар|food|
+med|ih|мёд|food|
+citron|ih|лимон|food|
+čokoláda|fh|шоколад|food|
+šunka|fh|ветчина|food|
+škola|fh|школа|pl|
+banka|fh|банк|pl|G2=bank
+kino|nh|кино|pl|
+město|nh|город|pl|
+divadlo|nh|театр|pl|
+obchod|ih|магазин|pl|Le=1
+restaurace|fs|ресторан|pl|
+kavárna|fh|кафе|pl|G2=kaváren
+knihovna|fh|библиотека|pl|G2=knihoven
+supermarket|ih|супермаркет|pl|
+nemocnice|fs|больница|pl|
+kancelář|fc|офис|pl|
+práce|fs|работа|pl|I=prací,G2=prací,D2=pracím,L2=pracích,I2=pracemi
+park|ih|парк|pl|
+bazén|ih|бассейн|pl|
+hotel|ih|гостиница|pl|
+kostel|ih|церковь|pl|G=kostela,Le=1
+třída|fh|класс|pl|
+pošta|fh|почта|pl|
+letiště|ns|аэропорт|pl|G2=letišť
+univerzita|fh|университет|pl|
+náměstí|ni|площадь|pl|
+nádraží|ni|вокзал|pl|
+koncert|ih|концерт|ev|L=koncertě/koncertu
+oběd|ih|обед|ev|G=oběda,L=obědě/obědu
+výlet|ih|поездка|ev|L=výletě/výletu
+zastávka|fh|остановка|pl|
+zahrada|fh|сад|pl|
+večeře|fs|ужин|ev|
+hora|fh|гора|pl|
+chata|fh|дача|pl|
+návštěva|fh|визит|ev|
+Praha|fh|Прага|city|
+Brno|nh|Брно|city|
+Berlín|ih|Берлин|city|G=Berlína,L=Berlíně
+Londýn|ih|Лондон|city|G=Londýna,L=Londýně
+Paříž|fc|Париж|city|
+Vídeň|fc|Вена|city|st=Vídň,A=Vídeň
+Itálie|fs|Италия|land|
+Francie|fs|Франция|land|
+Anglie|fs|Англия|land|
+Německo|nh|Германия|land|
+Rakousko|nh|Австрия|land|
+Slovensko|nh|Словакия|land|
+Polsko|nh|Польша|land|
+Rusko|nh|Россия|land|
+Španělsko|nh|Испания|land|
+Amerika|fh|Америка|land|
+Evropa|fh|Европа|land|
+čeština|fh|чешский язык|subj|
+angličtina|fh|английский язык|subj|
+matematika|fh|математика|subj|
+hudba|fh|музыка|subj top|
+historie|fs|история|subj top|
+kultura|fh|культура|top|
+sport|ih|спорт|top|
+politika|fh|политика|top|
+literatura|fh|литература|top|
+zkouška|fh|экзамен|ev|
+koruna|fh|крона|money|
+euro|nh|евро|money|
+čas|ih|время|abs|
+nápad|ih|идея|abs|
+den|ih|день|abs|st=dn,L=dni/dnu
+byt|ih|квартира|room|Le=1
+moře|ns|море|pl|G2=moří
+máslo|nh|масло|food|
+vesnice|fs|деревня|pl|
+věta|fh|предложение|t2|
+otázka|fh|вопрос|t2|
+zaměstnání|ni|работа|t2|
+`;
+const NOUNS=[];
+NOUN_SRC.trim().split('\n').forEach(line=>{
+  const [nom,cl,ru,tg,o]=line.split('|');
+  const ov={};(o||'').split(',').filter(Boolean).forEach(kv=>{const i=kv.indexOf('=');ov[kv.slice(0,i)]=kv.slice(i+1)});
+  NOUNS.push({nom,cl,ru,g:GENDER[cl],tags:tg.split(' '),f:decl(nom,cl,ov)});
+});
+const NN={};NOUNS.forEach(n=>{NN[n.nom]=n});
+// small things that lie on a table or in a bag
+const SMALL=()=>['sešit','kniha','tužka','propiska','klíč','dopis','lístek','fotka','učebnice','slovník','mobil','mapa'].map(x=>NN[x]);
+const tagged=(...t)=>NOUNS.filter(n=>t.some(x=>n.tags.includes(x)));
+const F=(n,k)=>(typeof n==='string'?NN[n]:n).f[k][0];   // the main form
+const FA=(n,k)=>(typeof n==='string'?NN[n]:n).f[k];     // every right form
+
+// adjectives: nový (hard) and moderní (soft)
+const CASE_G={N:1,G:1,D:1,A:1,L:1,I:1};
+function adjPalI(b){
+  if(b.endsWith('sk'))return b.slice(0,-2)+'št';
+  if(b.endsWith('ck'))return b.slice(0,-2)+'čt';
+  if(b.endsWith('ch'))return b.slice(0,-2)+'š';
+  const c=b.slice(-1),r=b.slice(0,-1);
+  return c==='k'?r+'c':c==='h'?r+'z':c==='r'?r+'ř':b;
+}
+// adj(word, case, gender): case N…I or N2…I2, gender mz mn f n
+function adj(a,k,g){
+  const b=a.slice(0,-1),m=g==='mz'||g==='mn';
+  if(a.endsWith('ý')){
+    const T={N:m?'ý':g==='f'?'á':'é',G:g==='f'?'é':'ého',D:g==='f'?'é':'ému',A:g==='mz'?'ého':g==='mn'?'ý':g==='f'?'ou':'é',
+      L:g==='f'?'é':'ém',I:g==='f'?'ou':'ým',N2:g==='n'?'á':'é',G2:'ých',D2:'ým',A2:g==='n'?'á':'é',L2:'ých',I2:'ými'};
+    if(k==='N2'&&g==='mz')return adjPalI(b)+'í';
+    return b+T[k];
+  }
+  const T={N:'í',G:g==='f'?'í':'ího',D:g==='f'?'í':'ímu',A:g==='mz'?'ího':'í',L:g==='f'?'í':'ím',I:g==='f'?'í':'ím',
+    N2:'í',G2:'ích',D2:'ím',A2:'í',L2:'ích',I2:'ími'};
+  return b+T[k];
+}
+// ten, tenhle
+function ten(k,g){
+  const m=g==='mz'||g==='mn';
+  const T={N:m?'ten':g==='f'?'ta':'to',G:g==='f'?'té':'toho',D:g==='f'?'té':'tomu',A:g==='mz'?'toho':g==='mn'?'ten':g==='f'?'tu':'to',
+    L:g==='f'?'té':'tom',I:g==='f'?'tou':'tím',N2:g==='mz'?'ti':g==='n'?'ta':'ty',G2:'těch',D2:'těm',A2:g==='n'?'ta':'ty',L2:'těch',I2:'těmi'};
+  return T[k];
+}
+// possessives: můj, tvůj, svůj, náš, váš, jeho, její, jejich; several right forms with «/»
+function poss(w,k,g){
+  if(w==='jeho'||w==='jejich')return w;
+  if(w==='její')return adj('její',k,g);
+  const m=g==='mz'||g==='mn';
+  if(w==='náš'||w==='váš'){
+    const p=w==='náš'?'naš':'vaš',P=w;
+    const T={N:m?P:p+'e',G:g==='f'?p+'í':p+'eho',D:g==='f'?p+'í':p+'emu',A:g==='mz'?p+'eho':g==='mn'?P:g==='f'?p+'i':p+'e',
+      L:g==='f'?p+'í':p+'em',I:g==='f'?p+'í':p+'ím',N2:g==='mz'?p+'i':p+'e',G2:p+'ich',D2:p+'im',A2:p+'e',L2:p+'ich',I2:p+'imi'};
+    return T[k];
+  }
+  const p={'můj':'m','tvůj':'tv','svůj':'sv'}[w];
+  const T={N:m?w:g==='f'?p+'oje/'+p+'á':p+'oje/'+p+'é',G:g==='f'?p+'é/'+p+'ojí':p+'ého',D:g==='f'?p+'é/'+p+'ojí':p+'ému',
+    A:g==='mz'?p+'ého':g==='mn'?w:g==='f'?p+'oji/'+p+'ou':p+'oje/'+p+'é',L:g==='f'?p+'é/'+p+'ojí':p+'ém',I:g==='f'?p+'ou/'+p+'ojí':p+'ým',
+    N2:g==='mz'?p+'oji/'+p+'í':g==='n'?p+'oje/'+p+'á':p+'oje/'+p+'é',G2:p+'ých',D2:p+'ým',A2:g==='n'?p+'oje/'+p+'á':p+'oje/'+p+'é',L2:p+'ých',I2:p+'ými'};
+  return T[k];
+}
+// every combination of the right variants of each word: ['moji/mou','sestru'] → ['moji sestru','mou sestru']
+const combos=parts=>parts.reduce((acc,p)=>{const v=Array.isArray(p)?p:alts(p);return acc.flatMap(a=>v.map(x=>a?a+' '+x:x))},['']);
+
+// personal pronouns: short forms, forms after a preposition (…p)
+const PRON={
+  'já':{A:'mě/mne',Ap:'mě/mne',G:'mě/mne',Gp:'mě/mne',D:'mi',Dp:'mně',L:'mně',I:'mnou'},
+  'ty':{A:'tě',Ap:'tebe',G:'tě',Gp:'tebe',D:'ti',Dp:'tobě',L:'tobě',I:'tebou'},
+  'on':{A:'ho',Ap:'něj/něho',G:'ho',Gp:'něj/něho',D:'mu',Dp:'němu',L:'něm',I:'ním'},
+  'ona':{A:'ji',Ap:'ni',G:'jí',Gp:'ní',D:'jí',Dp:'ní',L:'ní',I:'ní'},
+  'my':{A:'nás',Ap:'nás',G:'nás',Gp:'nás',D:'nám',Dp:'nám',L:'nás',I:'námi'},
+  'vy':{A:'vás',Ap:'vás',G:'vás',Gp:'vás',D:'vám',Dp:'vám',L:'vás',I:'vámi'},
+  'oni':{A:'je',Ap:'ně',G:'jich',Gp:'nich',D:'jim',Dp:'nim',L:'nich',I:'nimi'}
+};
+
+// prepositions that take a vowel: ve škole, ke kamarádce, se sestrou
+const vVe=w=>/^(v|f|tř|čt|kd)/i.test(w)||/^[szšž][^aeiouyáéíóúůýě]/i.test(w)||/^(městě|mně)/.test(w)?'ve':'v';
+const kKe=w=>/^[kg]/i.test(w)||/^[szšž][^aeiouyáéíóúůýě]/i.test(w)||w==='mně'?'ke':'k';
+const sSe=w=>/^[szšž]/i.test(w)||/^ps/.test(w)||w==='mnou'?'se':'s';
+const zZe=w=>/^[szšž]/i.test(w)?'ze':'z';
+
+// ---------- verbs ----------
+// persons: 0 já, 1 ty, 2 on/ona, 3 my, 4 vy, 5 oni
+const PRONS=['já','ty','on','my','vy','oni'];
+const P6=[{p:'já',i:0},{p:'ty',i:1},{p:'on',i:2},{p:'ona',i:2},{p:'my',i:3},{p:'vy',i:4},{p:'oni',i:5}];
+// inf|class or six forms (comma; «/» variants)|past (masc.)|russian
+// classes: ovat (pracovat), at (dělat), it (mluvit), et (bydlet: oni also -ejí)
+const VERB_SRC=`
+být|jsem,jsi,je,jsme,jste,jsou|byl|быть
+mít|mám,máš,má,máme,máte,mají|měl|иметь
+studovat|ovat||учиться
+pracovat|ovat||работать
+cestovat|ovat||путешествовать
+tancovat|ovat||танцевать
+nakupovat|ovat||делать покупки
+lyžovat|ovat||кататься на лыжах
+sportovat|ovat||заниматься спортом
+telefonovat|ovat||звонить
+děkovat|ovat||благодарить
+kupovat|ovat||покупать
+potřebovat|ovat||нуждаться
+malovat|ovat||рисовать
+parkovat|ovat||парковать
+jmenovat se|ovat||называться
+dělat|at||делать
+čekat|at||ждать
+hledat|at||искать
+znát|at|znal|знать
+poslouchat|at||слушать
+říkat|at||говорить
+odpočívat|at||отдыхать
+dívat se|at||смотреть
+zpívat|at||петь
+spěchat|at||спешить
+zajímat se|at||интересоваться
+snídat|at||завтракать
+obědvat|at||обедать
+vstávat|at||вставать
+ptát se|at|ptal|спрашивать
+starat se|at||заботиться
+povídat si|at||болтать
+mluvit|it||говорить
+prosit|it||просить
+vařit|it||варить
+učit se|it||учиться
+platit|it||платить
+končit|it||заканчивать
+kouřit|it||курить
+těšit se|it||радоваться
+myslet|it||думать
+vidět|it||видеть
+sedět|it||сидеть
+ležet|it||лежать
+slyšet|it||слышать
+bydlet|et||жить
+rozumět|et||понимать
+umět|et||уметь
+spát|spím,spíš,spí,spíme,spíte,spí|spal|спать
+jíst|jím,jíš,jí,jíme,jíte,jedí|jedl|есть
+vědět|vím,víš,ví,víme,víte,vědí|věděl|знать
+psát|píšu/píši,píšeš,píše,píšeme,píšete,píšou/píší|psal|писать
+jít|jdu,jdeš,jde,jdeme,jdete,jdou|šel|идти
+jet|jedu,jedeš,jede,jedeme,jedete,jedou|jel|ехать
+číst|čtu,čteš,čte,čteme,čtete,čtou|četl|читать
+pít|piju/piji,piješ,pije,pijeme,pijete,pijou/pijí|pil|пить
+mýt|myju/myji,myješ,myje,myjeme,myjete,myjou/myjí|myl|мыть
+přát si|přeju/přeji,přeješ,přeje,přejeme,přejete,přejou/přejí|přál|желать
+žít|žiju/žiji,žiješ,žije,žijeme,žijete,žijou/žijí|žil|жить
+hrát|hraju/hraji,hraješ,hraje,hrajeme,hrajete,hrajou/hrají|hrál|играть
+brát|beru,bereš,bere,bereme,berete,berou|bral|брать
+moct|můžu/mohu,můžeš,může,můžeme,můžete,můžou/mohou|mohl|мочь
+muset|musím,musíš,musí,musíme,musíte,musí|musel|быть должным
+chtít|chci,chceš,chce,chceme,chcete,chtějí|chtěl|хотеть
+smět|smím,smíš,smí,smíme,smíte,smějí/smí|směl|сметь
+chodit|it||ходить
+jezdit|it||ездить
+nosit|it||носить
+běhat|at||бегать
+`;
+const VERBS={};
+VERB_SRC.trim().split('\n').forEach(line=>{
+  const [inf,cl,past,ru]=line.split('|');
+  const [base,refl]=inf.split(' ');
+  let forms;
+  if(cl==='ovat'){const s=base.slice(0,-4);forms=[s+'uju/'+s+'uji',s+'uješ',s+'uje',s+'ujeme',s+'ujete',s+'ujou/'+s+'ují']}
+  else if(cl==='at'){const s=base.slice(0,-2);forms=['ám','áš','á','áme','áte','ají'].map(e=>s+e)}
+  else if(cl==='it'||cl==='et'){const s=base.slice(0,-2);forms=['ím','íš','í','íme','íte','í'].map(e=>s+e);if(cl==='et')forms[5]=s+'í/'+s+(base.endsWith('ět')?'ějí':'ejí')}
+  else forms=cl.split(',');
+  VERBS[inf]={inf,base,refl:refl||'',ru,pres:forms.map(alts),past:past||base.slice(0,-1)+'l'};
+});
+const V=inf=>VERBS[inf];
+const pres=(inf,i)=>V(inf).pres[i];
+// past participle from the masculine one: dělal → dělala, šel → šla, přišel → přišli; g is m f n pl
+const pastF=(m,g)=>g==='m'?m:(m.endsWith('šel')?m.slice(0,-3)+'šl':m)+{f:'a',n:'o',pl:'i'}[g];
+const past=(inf,g)=>pastF(V(inf).past,g);
+
+// ---------- exercise builders ----------
+// a choice: «fixed» keeps the options in the given order, otherwise they are shuffled
+function choice(q,opts,right,e,fixed){
+  const o=[...new Set(opts.filter(Boolean))];if(!o.includes(right))o.unshift(right);
+  const list=fixed?o:mixed(o);
+  return {t:'c',q,o:list,a:list.indexOf(right),e};
+}
+const write=(q,a,e)=>({t:'i',q,a:[...new Set([].concat(a).flatMap(alts))],e});
+const order=(a,alt,e)=>({t:'o',a,alt:alt&&alt.length?alt:undefined,e});
+const pairs=p=>({t:'m',p});
+// one of several task makers, by weight
+const R=(...subs)=>()=>{let r=Math.random()*subs.reduce((s,x)=>s+x[0],0);for(const [w,f] of subs)if((r-=w)<0)return f();return subs[0][1]()};
+// the other forms of a verb or word as wrong options, never one that is also right
+const others=(all,right,n)=>some([...new Set(all.flat())].filter(x=>!right.includes(x)),n);
+
+// people and names
+const NM=['Petr','Adam','Tomáš','Karel','Pavel','David','Martin','Jakub','Filip','Ondřej'];
+const NF=['Jana','Eva','Alena','Petra','Hana','Lenka','Tereza','Lucie','Marie'];
+const couple=()=>{const m=pick(NM),f=pick(NF);return Math.random()<.5?`${m} a ${f}`:`${f} a ${m}`};
+// subjects: t text, i person 0–5, g m f n pl
+const PS=[{t:'já',i:0,g:'m'},{t:'já',i:0,g:'f'},{t:'ty',i:1,g:'m'},{t:'ty',i:1,g:'f'},{t:'on',i:2,g:'m'},{t:'ona',i:2,g:'f'},{t:'my',i:3,g:'pl'},{t:'vy',i:4,g:'pl'},{t:'oni',i:5,g:'pl'}];
+const anySubj=()=>R([4,()=>pick(PS)],[2,()=>({t:pick(NM),i:2,g:'m'})],[2,()=>({t:pick(NF),i:2,g:'f'})],[1,()=>({t:couple(),i:5,g:'pl'})])();
+const GRU={m:'муж.',f:'жен.'};
+// a hint naming the person: «já, жен.» where the form shows the gender
+const who=(s,gendered)=>s.t+(gendered&&s.i<2&&GRU[s.g]?', '+GRU[s.g]:'')+(gendered&&s.i===4?', мн. ч.':'');
+// the gap of a verb with its clitics (se, si, jsem): after the first word the clitics lead (Večer se díváme),
+// at the start of the sentence the verb leads (Díváme se)
+const gapV=(lead,verb,cl)=>lead?[cl,verb].filter(Boolean).join(' '):cap(verb)+(cl?' '+cl:'');
+const forms=(inf,i)=>pres(inf,i);
+const neg=f=>f==='je'?'není':'ne'+f;
+
+// adjectives that suit a noun
+const ADJ_FOR={víno:['červený','bílý','dobrý'],káva:['černý','dobrý'],čaj:['černý','zelený','teplý'],pivo:['studený','český','dobrý'],voda:['studený'],mléko:['teplý','studený'],
+  džus:['pomerančový'],polévka:['dobrý','teplý'],rohlík:['čerstvý'],chléb:['čerstvý'],dort:['čokoládový','dobrý'],zmrzlina:['čokoládový','dobrý'],salát:['čerstvý','zeleninový'],
+  koláč:['dobrý'],jablko:['zelený','červený'],ryba:['čerstvý'],sýr:['český','dobrý'],čokoláda:['dobrý'],dítě:['malý','hezký'],pes:['malý','velký','černý'],kočka:['malý','černý'],
+  hudba:['český','moderní','klasický'],kultura:['český'],literatura:['český','moderní'],politika:['český','evropský'],sport:['moderní'],historie:['český','evropský'],
+  dědeček:['starý'],babička:['starý'],manžel:[],manželka:[],tatínek:[],maminka:[],matka:[],otec:[],bratr:['malý','starší','mladší'],sestra:['malý','starší','mladší'],syn:['malý','starší'],dcera:['malý','starší'],
+  film:['nový','český','zajímavý','dlouhý'],kniha:['nový','zajímavý','český','dobrý'],úkol:['nový','těžký','domácí'],test:['těžký','nový'],text:['dlouhý','těžký','nový']};
+const ADJ_TAG={p:['nový','mladý','milý','dobrý','sympatický'],fam:['mladý','starý'],t:['nový','starý','velký','malý','drahý','levný','hezký','moderní'],clo:['nový','černý','hezký','drahý','levný'],
+  fur:['nový','starý','velký','malý','moderní'],pl:['nový','starý','velký','malý','moderní','hezký'],bld:['nový','starý','velký','malý','moderní'],room:['velký','malý','hezký'],
+  tr:['nový','starý','rychlý'],wr:['nový','černý','modrý'],food:['dobrý'],drink:['dobrý'],top:['český','moderní'],subj:[],city:[],land:[],ev:['dlouhý']};
+const TAG_ORDER=['fam','a','clo','wr','fur','room','bld','tr','food','drink','top','subj','t','p','pl','city','land','ev'];
+const adjsFor=n=>ADJ_FOR[n.nom]||ADJ_TAG[TAG_ORDER.find(t=>n.tags.includes(t))]||[];
+// a noun phrase in one case, every right variant: phrase(n,'A',{a:'nový',d:1,o:'můj'})
+function phrase(n,k,m={}){
+  const g=n.g,parts=[];
+  if(m.d)parts.push(ten(k,g));
+  if(m.o)parts.push(poss(m.o,k,g));
+  if(m.a)parts.push(adj(m.a,k,g));
+  parts.push(n.f[k]||n.f.N);
+  return combos(parts);
+}
+const nom=(n,m,pl)=>phrase(n,pl?'N2':'N',m)[0];
+// modifiers for a noun: none, an adjective, ten / a possessive, or both
+function mods(n,{dem=true,own=false,adjP=.35}={}){
+  const m={},A=adjsFor(n),r=Math.random();
+  if(A.length&&r<adjP)m.a=pick(A);
+  const r2=Math.random();
+  if(dem&&r2<.25)m.d=1;else if(own&&r2<.45&&!n.tags.includes('name'))m.o=pick(['můj','tvůj','náš','váš']);
+  return m;
+}
+const T=(...t)=>tagged(...t).filter(n=>!n.tags.includes('name'));
+const persons=()=>T('p').filter(n=>n.nom!=='dítě');
+const notName=n=>!n.tags.includes('name');
+
+const G={};
+
+// ================= LEKCE 1 =================
+const PR=[['já','я'],['ty','ты'],['on','он'],['ona','она'],['ono','оно'],['my','мы'],['vy','вы'],['oni','они']];
+const BE1=[['<i>Jsem</i> Dana.','já'],['<i>Jsem</i> student.','já'],['<i>Nejsem</i> doma.','já'],['<i>Jsi</i> doma?','ty'],['<i>Jsi</i> Petr?','ty'],['<i>Nejsi</i> student?','ty'],
+  ['<i>Jsme</i> doma.','my'],['<i>Jsme</i> studenti.','my'],['<i>Nejsme</i> tady.','my'],['<i>Jste</i> pan Novák?','vy'],['<i>Jste</i> studenti?','vy'],['<i>Nejste</i> doma?','vy'],
+  ['<i>Jsou</i> doma.','oni'],['<i>Jsou</i> tady.','oni'],['<i>Nejsou</i> Češi.','oni']];
+G.l1r0=R(
+  [1,()=>pairs(some(PR,5))],
+  [2,()=>{const [cz,ru]=pick(PR);return choice(`Как сказать «${ru}»?`,[cz,...others(PR.map(p=>p[0]),[cz],3)],cz)}],
+  [2,()=>{const [cz,ru]=pick(PR);return choice(`«${cz}» — это…`,[ru,...others(PR.map(p=>p[1]),[ru],3)],ru)}],
+  [3,()=>{const [s,p]=pick(BE1);return choice(`${s} — Какое местоимение подразумевается?`,[p,...others(['já','ty','on','ona','my','vy','oni'],[p],3)],p)}],
+  [1,()=>{const sg=['já','ty','on','ona','ono'],pl=['my','vy','oni'];
+    if(Math.random()<.5){const x=pick(sg);return choice('Три местоимения — plurál (мн. ч.), одно — singulár. Выберите лишнее:',[...pl,x],x)}
+    const x=pick(['my','oni']);return choice('Три местоимения — singulár (ед. ч.), одно — plurál. Выберите лишнее:',[...some(sg,3),x],x)}]
+);
+
+const B_SUBJ=[['Já',0,'m'],['Já',0,'f'],['Ty',1,'m'],['Ty',1,'f'],['Petr',2,'m'],['Adam',2,'m'],['Jana',2,'f'],['Alena',2,'f'],['Pan Novák',2,'m'],['Paní Nováková',2,'f'],
+  ['My',3,'pl'],['Vy',4,'pl'],['Oni',5,'pl'],['Petr a Jana',5,'pl'],['Eva a Adam',5,'pl']];
+const B_PRED={m:['student','doktor','Čech','učitel','manažer','Američan','doma','tady'],f:['studentka','doktorka','Češka','učitelka','manažerka','Američanka','doma','tady'],pl:['studenti','doma','tady']};
+const beTask=negate=>{
+  const [s,i,g]=pick(B_SUBJ),p=pick(B_PRED[g]),f=forms('být',i)[0],q=i===1||i===4?pick(['?','.']):'.';
+  return write(`${s} ___ ${p}${q} (být${negate?' — negace':''})`,negate?neg(f):f,negate&&f==='je'?'Отрицание от je — není.':undefined);
+};
+const REG=[{f:1,g:'m',a:'Dobrý den, pane Nový',p:['student','Čech','doma']},{f:1,g:'f',a:'Dobrý den, paní Malá',p:['studentka','Češka','učitelka']},
+  {f:1,g:'m',a:'Dobrý večer, pane doktore',p:['Čech','tady','doma']},{f:1,g:'f',a:'Dobrý den, paní učitelko',p:['Češka','tady','doma']},{f:1,g:'m',a:'Dobré ráno, pane Dvořáku',p:['student','tady']},
+  {f:0,g:'m',a:'Ahoj Karle',p:['student','doma','tady']},{f:0,g:'f',a:'Čau Jano',p:['studentka','doma','Češka']},{f:0,g:'m',a:'Ahoj Petře',p:['Čech','doma','student']},
+  {f:0,g:'f',a:'Ahoj Evo',p:['studentka','tady','doma']},{f:0,g:'m',a:'Čau Tomáši',p:['student','tady']}];
+const FORMAL=[['Ahoj.','Dobrý den.'],['Jak se máš?','Jak se máte?'],['Promiň.','Promiňte.'],['Jak se jmenuješ?','Jak se jmenujete?'],['Odkud jsi?','Odkud jste?'],['Jsi tady?','Jste tady?']];
+G.l1r1=R(
+  [5,()=>beTask(false)],
+  [3,()=>beTask(true)],
+  [2,()=>{const r=pick(REG);return choice(`${r.a}, ___ ${r.f?'jste':'jsi'} ${pick(r.p)}?`,['ty','vy'],r.f?'vy':'ty',r.f?'Официально, на «Вы»: vy jste.':'Неофициально, на «ты»: ty jsi.',true)}],
+  [2,()=>{const r=pick(REG);return choice(`${r.a}, ___ ${pick(r.p)}?`,['jsi','jste'],r.f?'jste':'jsi',undefined,true)}],
+  [1,()=>pairs(some(FORMAL,4))],
+  [2,()=>pick([
+    ()=>order(`Dobrý den, jste ${pick(['pan Novák','paní Malá','Alena Králová','Petr Dvořák'])}?`),
+    ()=>order(`Ahoj, jsi ${pick(['Petr','Jana','Adam','Eva'])}?`),
+    ()=>order(`${pick(['Petr','Jana','Pan Novák','Paní Malá'])} není doma.`),
+    ()=>order(`Já nejsem ${pick(['student','doktor','Čech','učitel'])}.`),
+    ()=>order(`Vy nejste ${pick(['doma','tady'])}?`)])()]
+);
+
+// vocative: nominative, vocative, why (e), register (f formal / i informal)
+const VOC=[
+  ...['Jana','Eva','Alena','Madla','Petra','Hana','Lenka','Kateřina','Martina','Dana','Tereza','Zuzana'].map(n=>[n,n.slice(0,-1)+'o','Женское имя на -a: -a → -o.','i']),
+  ...['Lucie','Marie','Natálie','Dagmar'].map(n=>[n,n,'Женские имена не на -a в обращении не меняются.','i']),
+  ...['Adam','Šimon','Jan','Martin','Václav','Josef','Roman','David','Jakub','Filip','Libor'].map(n=>[n,n+'e','После твёрдой согласной → -e.','i']),
+  ['Petr','Petře','-r после согласной → -ře.','i'],['Alexandr','Alexandře','-r после согласной → -ře.','i'],
+  ...['Aleš','Tomáš','Matěj','Ondřej','Lukáš','Miloš'].map(n=>[n,n+'i','После мягкой согласной (š, ž, č, ř, j) → -i.','i']),
+  ['Marek','Marku','-ek → -ku: e выпадает, на -k → -u.','i'],['Dominik','Dominiku','На -k → -u.','i'],['Patrik','Patriku','На -k → -u.','i'],['Jindřich','Jindřichu','На -ch → -u.','i'],
+  ...['Honza','Jirka','Míra'].map(n=>[n,n.slice(0,-1)+'o','Мужское имя на -a → -o, как женское.','i']),
+  ['pan Nový','pane Nový','Фамилия-прилагательное не меняется, меняется только pan → pane.','f'],['pan Černý','pane Černý','Фамилия-прилагательное не меняется, меняется только pan → pane.','f'],
+  ['pan Novák','pane Nováku','На -k → -u, pan → pane.','f'],['pan Dvořák','pane Dvořáku','На -k → -u, pan → pane.','f'],['pan Vlach','pane Vlachu','На -ch → -u, pan → pane.','f'],
+  ['pan Pospíšil','pane Pospíšile','После твёрдой согласной → -e, pan → pane.','f'],['pan Svoboda','pane Svobodo','Фамилия на -a → -o, pan → pane.','f'],
+  ['pan učitel','pane učiteli','Слова на -tel → -i.','f'],['pan doktor','pane doktore','После твёрдой согласной → -e.','f'],['pan profesor','pane profesore','После твёрдой согласной → -e.','f'],
+  ['paní Nováková','paní Nováková','paní и фамилии на -ová не меняются.','f'],['paní Malá','paní Malá','paní и фамилии-прилагательные не меняются.','f'],
+  ['paní učitelka','paní učitelko','paní не меняется, učitelka → učitelko.','f'],['paní doktorka','paní doktorko','paní не меняется, doktorka → doktorko.','f'],['slečna Jana','slečno Jano','slečna → slečno, Jana → Jano.','f']];
+const GREET={i:['Ahoj ___!','Čau ___!','Jak se máš, ___?','Děkuju, ___!','Promiň, ___!','Ahoj ___, jak se máš?'],f:['Dobrý den, ___!','Dobrý večer, ___!','Dobré ráno, ___!','Na shledanou, ___!','Jak se máte, ___?','Děkuju, ___!']};
+const vocTask=list=>R(
+  [5,()=>{const [n,v,e,r]=pick(list);return write(`${pick(GREET[r])} (${n})`,v,e)}],
+  [1,()=>{const c=list.filter(x=>x[3]==='i'&&!x[0].includes(' ')),[n,v,e]=pick(c);
+    const st=/[aeo]$/.test(n)?n.slice(0,-1):n;
+    return choice(`Как обратиться: <i>${n}</i>?`,[v,...others([n,st+'e',st+'u',st+'o',st+'i',st+'a'],[v],3)],v,e)}]
+);
+G.l1r2=vocTask(VOC);
+
+const KDO_P=['student','učitelka','učitel','doktor','slečna','pan Novák','paní Malá','Matěj','Jana','kamarád','studentka','pes','kočka','manažer'];
+const KDO_T=['mapa','formulář','ulice','adresa','sešit','kniha','počítač','mobil','auto','okno','telefon','číslo','tabule','židle','město','pas'];
+G.l1r3=R(
+  [6,()=>{const p=Math.random()<.5,x=pick(p?KDO_P:KDO_T);return choice(`___ je to? — To je ${x}.`,['Kdo','Co'],p?'Kdo':'Co',x==='pes'||x==='kočka'?'О животных тоже спрашивают kdo.':undefined,true)}],
+  [1,()=>Math.random()<.5?order(`Kdo je to? To je ${pick(KDO_P.filter(x=>!x.includes(' ')))}.`):order(`Co je to? To je ${pick(KDO_T)}.`)]
+);
+
+// ================= LEKCE 2 =================
+const GEN_RU={mz:'M',mn:'M',f:'F',n:'Neu'};
+const GEN_EXTRA=[['paní','F','paní — женский род, хотя оканчивается на -í.'],['národnost','F','Суффикс -ost → женский род.'],['místnost','F','Суффикс -ost → женский род.'],
+  ['skříň','F','Мягкая согласная, но женский род — запоминать.'],['postel','F','Женский род на согласную — запоминать.'],['tramvaj','F','Женский род на согласную — запоминать.'],
+  ['kancelář','F','Женский род на согласную — запоминать.'],['noc','F','Женский род на согласную — запоминать.'],['věc','F','Женский род на согласную — запоминать.']];
+const genderNouns=()=>NOUNS.filter(n=>notName(n)&&n.cl!=='ns'&&!n.tags.includes('city')&&!n.tags.includes('land')&&!['fc','fk'].includes(n.cl)&&n.nom!=='dítě');
+G.l2r0=R(
+  [5,()=>{const n=pick(genderNouns());return choice(n.nom,['M','F','Neu'],GEN_RU[n.g],undefined,true)}],
+  [1,()=>{const [w,g,e]=pick(GEN_EXTRA);return choice(w,['M','F','Neu'],g,e,true)}]
+);
+
+const l2nouns=()=>NOUNS.filter(n=>notName(n)&&!['city','land','subj','top','money','ev','abs','t2'].some(t=>n.tags.includes(t))&&!['dítě','práce'].includes(n.nom));
+const JEDEN={mz:'jeden',mn:'jeden',f:'jedna',n:'jedno'};
+G.l2r1=R(
+  [5,()=>{const n=pick(l2nouns());return write(`___ ${n.nom} (ten/ta/to)`,ten('N',n.g))}],
+  [2,()=>{const n=pick(l2nouns().filter(x=>!x.tags.includes('drink')&&!['zelenina','maso','cukr','med'].includes(x.nom)));return choice(`Tady je ___ ${n.nom}.`,['jeden','jedna','jedno'],JEDEN[n.g],undefined,true)}],
+  [2,()=>{const n=pick(l2nouns());return choice(`___ ${n.nom} je tady.`,['Ten','Ta','To'],cap(ten('N',n.g)),undefined,true)}]
+);
+
+const l2adj=()=>l2nouns().concat(NN['dítě'],NN['Praha'],NN['Brno']).filter(n=>adjsFor(n).length||n.tags.includes('city'));
+const adjOf=n=>n.tags.includes('city')?pick(['velký','malý','hezký','krásný','moderní','starý']):pick(adjsFor(n));
+const l2pred=()=>l2adj().filter(n=>!n.tags.includes('city'));
+const BASIC=['nový','starý','velký','malý','hezký','dobrý'];
+G.l2r2=R(
+  [4,()=>{const n=pick(l2pred()),a=adjOf(n);return write(`To je ___ ${n.nom}. (${a})`,adj(a,'N',n.g))}],
+  [3,()=>{const n=pick(l2adj()),a=adjOf(n),s=n.tags.includes('city')?n.nom:`${cap(ten('N',n.g))} ${n.nom}`;
+    return write(`${s} je ${pick(['','moc ','velmi '])}___. (${a})`,adj(a,'N',n.g))}],
+  [2,()=>{const n=pick(l2pred().filter(x=>adjsFor(x).some(a=>BASIC.includes(a)))),a=pick(adjsFor(n).filter(a=>BASIC.includes(a)));
+    return choice(`To je ___ ${n.nom}.`,[adj(a,'N','mz'),adj(a,'N','f'),adj(a,'N','n')],adj(a,'N',n.g),undefined,true)}],
+  [1,()=>{const s=pick(['moderní','inteligentní','starší','telefonní','mladší','cizí']);return choice('Какое прилагательное одинаково во всех родах?',[s,...some(['nový','malý','hezký','starý','dobrý','velký'],3)],s,'Мягкие прилагательные на -í одинаковы во всех родах.')}]
+);
+
+const JAKY={mz:'Jaký',mn:'Jaký',f:'Jaká',n:'Jaké'};
+G.l2r3=()=>{const n=pick(l2adj().filter(x=>!x.tags.includes('city'))),a=adjOf(n),ans=Math.random()<.5?` — ${cap(ten('N',n.g))} ${n.nom} je ${adj(a,'N',n.g)}.`:'';
+  return choice(`___ je ${ten('N',n.g)} ${n.nom}?${ans}`,['Jaký','Jaká','Jaké'],JAKY[n.g],undefined,true)};
+
+const OVAT={studovat:['češtinu','v Praze','na univerzitě','medicínu'],pracovat:['v bance','doma','v kanceláři','v nemocnici'],cestovat:['autem','po Evropě','vlakem'],
+  tancovat:['salsu','na diskotéce'],nakupovat:['v supermarketu','v sobotu'],lyžovat:['v zimě','na horách'],sportovat:['každý den','v parku'],telefonovat:['domů','každý večer'],
+  kupovat:['chleba','dárky'],potřebovat:['nový mobil','slovník'],malovat:['obraz','doma']};
+const S2=[['Já',0],['Ty',1],['Petr',2],['Jana',2],['Pan Novák',2],['My',3],['Vy',4],['Oni',5],['Alena a Libor',5],['Petr a Eva',5]];
+G.l2r4=R(
+  [4,()=>{const v=pick(Object.keys(OVAT)),s=pick(PS);return write(`${s.t} ___ (${v})`,forms(v,s.i))}],
+  [3,()=>{const v=pick(Object.keys(OVAT)),[s,i]=pick(S2);return write(`${s} ___ ${pick(OVAT[v])}. (${v})`,forms(v,i))}],
+  [2,()=>{const v=pick(Object.keys(OVAT)),s=pick(PS);return write(`${s.t} ___ (${v}) — negace`,forms(v,s.i).map(neg))}],
+  [1,()=>{const [s,i,n]=pick([['Já',0,'Dáša.'],['Já',0,'Matěj.'],['Ty',1,'Lucie?'],['Ten kluk',2,'Ondřej.'],['Ta paní',2,'Dana.'],['Moje sestra',2,'Eva.'],['My',3,'Novákovi.'],['Oni',5,'Dvořákovi.']]);
+    return write(`${s} ___ ${n} (jmenovat se)`,forms('jmenovat se',i).map(f=>'se '+f),'se стоит на втором месте, сразу после подлежащего.')}],
+  [2,()=>{const v=pick(Object.keys(OVAT)),[s,i]=pick(S2),f=forms(v,i);return choice(`${s} ___ ${pick(OVAT[v])}.`,[f[0],...others(V(v).pres.map(x=>x[0]),f,2)],f[0])}]
+);
+
+const RAD={m:'rád',f:'ráda',pl:'rádi'};
+const RAD_S=[{t:'Karel',i:2,g:'m'},{t:'Petr',i:2,g:'m'},{t:'Tomáš',i:2,g:'m'},{t:'Pan Novák',i:2,g:'m'},{t:'Alena',i:2,g:'f'},{t:'Eva',i:2,g:'f'},{t:'Jana',i:2,g:'f'},{t:'Paní Malá',i:2,g:'f'},
+  {t:'Petr a Marta',i:5,g:'pl'},{t:'Adam a Eva',i:5,g:'pl'},{t:'My',i:3,g:'pl'},{t:'Oni',i:5,g:'pl'},{t:'Já',i:0,g:'m',h:'я — мужчина'},{t:'Já',i:0,g:'f',h:'я — женщина'},
+  {t:'Ty',i:1,g:'m',h:'ты — мужчина'},{t:'Ty',i:1,g:'f',h:'ты — женщина'},{t:'Pane Nový, vy',i:4,g:'m',h:'вежливо к одному мужчине'},{t:'Paní Malá, vy',i:4,g:'f',h:'вежливо к одной женщине'},
+  {t:'Petře a Evo, vy',i:4,g:'pl'}];
+const RAD_V=['cestovat','tancovat','sportovat','nakupovat','lyžovat','telefonovat','studovat','pracovat','malovat'];
+G.l2r5=R(
+  [5,()=>{const s=pick(RAD_S),v=pick(RAD_V),q=s.i===4?'?':'.';return choice(`${s.t} ___ ${forms(v,s.i)[0]}${q}${s.h?` (${s.h})`:''}`,['rád','ráda','rádi'],RAD[s.g],s.i===4&&s.g!=='pl'?'Вежливое vy к одному человеку: rád / ráda по полу.':undefined,true)}],
+  [3,()=>{const s=pick(RAD_S.filter(x=>x.i!==4)),v=pick(RAD_V);return write(`${s.t} ___ ${forms(v,s.i)[0]}. (negace${s.h?', '+s.h:''})`,'ne'+RAD[s.g].replace('á','a'),'Отрицание: nerad, nerada, neradi — без долготы.')}]
+);
+
+const SE_S=[['Ta slečna','Maja'],['Ten muž','Josef'],['Paní Malá','Lucie'],['Ten pes','Hiro'],['To dítě','Adam'],['Ten kluk','Ondřej'],['Ta paní','Dana'],['Můj bratr','Pavel']];
+G.l2r6=R(
+  [4,()=>pick([
+    ()=>order(pick(['Jak se jmenuješ?','Jak se jmenujete?','Jak se máš?','Jak se máte?','Mám se dobře.'])),
+    ()=>order(`Jmenuju se ${pick(['Matěj Adamec','Lucie Malá','Petr Dvořák','Eva Nová'])}.`),
+    ()=>{const [s,n]=pick(SE_S);return order(`${s} se jmenuje ${n}.`)},
+    ()=>{const [s]=pick(SE_S);return order(`Jak se jmenuje ${low(s)}?`)}])()],
+  [2,()=>{if(Math.random()<.5){const n=pick(['Alena','Petr','Eva']);return choice('Где правильный порядок?',[`Já se jmenuju ${n}.`,`Já jmenuju se ${n}.`,`Se jmenuju ${n}.`],`Já se jmenuju ${n}.`)}
+    const [s,n]=pick(SE_S),[a,b]=s.split(' ');
+    return choice('Где правильный порядок?',[`${s} se jmenuje ${n}.`,pick([`${s} jmenuje se ${n}.`,`${a} se ${b} jmenuje ${n}.`]),`Se ${low(s)} jmenuje ${n}.`],`${s} se jmenuje ${n}.`,`«${s}» — одна группа слов на первой позиции, se идёт сразу за ней.`)}]
+);
+
+// ================= LEKCE 3 =================
+const AT={dělat:['úkol','večeři'],čekat:['na autobus','na kamaráda','na tramvaj'],hledat:['klíč','byt','práci'],znát:['Prahu','pana Nováka','tu písničku'],poslouchat:['hudbu','rádio'],
+  'dívat se':['na film','na televizi'],zpívat:['písničku','v divadle'],spěchat:['do školy','domů'],'zajímat se':['o sport','o hudbu','o politiku'],mít:['čas','hlad','auto','dva bratry'],
+  snídat:['v sedm hodin','doma'],obědvat:['v restauraci','ve škole'],vstávat:['v šest hodin','brzo'],odpočívat:['doma','v parku'],'ptát se':['učitele','na cestu']};
+const STAT=['znát','mít','vědět','umět','rozumět','bydlet','žít','myslet','vidět','slyšet','přát si','zajímat se','těšit se','jmenovat se'];
+const TIMEW=/hodin|brzo|ráno|večer|v zimě|v sobotu|každý|dlouho/;
+const leadFor=(v,tail)=>STAT.includes(v)||TIMEW.test(tail)?'':['jít','jet'].includes(v)?pick(['Dnes','Teď']):pick(['Dnes','Teď','Často']);
+const conjTask=table=>{
+  const v=pick(Object.keys(table)),vb=V(v),tail=pick(table[v]),r=Math.random();
+  if(r<.35){const s=pick(PS);return write(`${s.t} ___ (${v})`,forms(v,s.i).map(f=>vb.refl?vb.refl+' '+f:f),vb.refl?`${vb.refl} стоит на втором месте: ${s.t} ${vb.refl} ${forms(v,s.i)[0]}.`:undefined)}
+  if(r<.7){const s=anySubj();return write(`${cap(s.t)} ___ ${tail}. (${v})`,forms(v,s.i).map(f=>gapV(1,f,vb.refl)))}
+  const s=pick(PS),lead=Math.random()<.5?leadFor(v,tail):'';
+  return write(`${lead?lead+' ':''}___ ${tail}. (${v} – ${s.t})`,forms(v,s.i).map(f=>gapV(lead,f,vb.refl)));
+};
+G.l3r0=R(
+  [6,()=>conjTask(AT)],
+  [1,()=>{const s=pick(PS);return write(`Co tady ___? (dělat – ${s.t})`,forms('dělat',s.i))}],
+  [2,()=>{const v=pick(Object.keys(AT).filter(x=>!V(x).refl)),s=pick(PS),f=forms(v,s.i);return choice(`(${s.t}) ___ ${pick(AT[v])}.`,[f[0],...others(V(v).pres.map(x=>x[0]),f,2)],f[0])}]
+);
+
+const OWN={já:'můj',ty:'tvůj',on:'jeho',ona:'její',my:'náš',vy:'váš',oni:'jejich'};
+const possNouns=()=>T('fam','t','a').concat(NN['auto'],NN['město'],NN['pokoj']).filter(n=>n.nom!=='věc');
+G.l3r1=R(
+  [3,()=>{const n=pick(possNouns()),o=pick(Object.keys(OWN));return write(`To je ___ ${n.nom}. (${o})`,poss(OWN[o],'N',n.g))}],
+  [2,()=>{const n=pick(possNouns()),o=pick(Object.keys(OWN)),p=n.tags.includes('p')||n.tags.includes('a')?pick(['doma','tady']):pick(['tady',adj(pick(['nový','starý','velký','malý']),'N',n.g)]);
+    return write(`___ ${n.nom} je ${p}. (${o})`,poss(OWN[o],'N',n.g))}],
+  [2,()=>{const n=pick(possNouns()),o=pick(Object.keys(OWN)),f=n.tags.includes('p')||n.tags.includes('a')?pick(['Je tady ___ {n}?','Kde je ___ {n}?','Jak se jmenuje ___ {n}?']):pick(['Je tady ___ {n}?','Kde je ___ {n}?']);
+    return write(`${f.replace('{n}',n.nom)} (${o})`,poss(OWN[o],'N',n.g))}],
+  [1,()=>{const n=pick(possNouns().filter(x=>!x.tags.includes('p'))),m=poss('můj','N',n.g).split('/')[0];return choice(`___ je ${ten('N',n.g)} ${n.nom}? — ${cap(m)}.`,['Kdo','Čí',JAKY[n.g]],'Čí')}],
+  [2,()=>{const n=pick(possNouns()),o=pick(['on','ona','oni']);return choice(`To je ___ ${n.nom}. (${o})`,['jeho','její','jejich'],OWN[o],'jeho, její, jejich не меняются по роду предмета.',true)}]
+);
+
+G.l3r2=()=>{const n=pick(NOUNS.filter(x=>(x.g==='mz'||x.g==='mn')&&notName(x)&&!x.tags.includes('city')));
+  return choice(n.nom,['Mž','Mn'],n.g==='mz'?'Mž':'Mn',n.tags.includes('a')?'Животные — одушевлённые, как люди.':undefined,true)};
+
+const ACC_FR=[['Mám ___.',['fam','a'],{own:0}],['Hledám ___.',['p','t','a'],{own:1}],['Znám ___.',['p','city'],{own:1}],['Kupuju ___.',['buy','clo','food'],{own:0}],
+  ['Potřebuju ___.',['buy','clo'],{own:0}],['Čekám na ___.',['p','tr'],{own:1}],['Dám si ___.',['drink','dish'],{own:0}],['Mám rád ___.',['p','food','drink','city','top'],{own:1}],
+  ['Vidím ___.',['p','a','t'],{own:1}],['Zajímám se o ___.',['top'],{own:0}],['Nemám ___.',['t','fam'],{own:0}],['Hledáte ___?',['p','t'],{own:1}],['Znáš ___?',['p','city'],{own:1}],['Máte ___?',['t','fam','a'],{own:0}]];
+const DISH=['polévka','zmrzlina','rohlík','salát','dort','koláč','jablko','banán','ryba','čokoláda','chléb'];
+const BUY=['sešit','kniha','tužka','propiska','mapa','slovník','deštník','lístek','mobil','počítač','taška','lampa','židle','kolo','auto','dárek','klíč'];
+const accNouns=tags=>NOUNS.filter(n=>tags.some(t=>t==='dish'?DISH.includes(n.nom):t==='buy'?BUY.includes(n.nom):n.tags.includes(t))&&n.nom!=='věc'&&!(n.tags.includes('name')&&!tags.includes('p'))&&n.g!==undefined);
+const ACC_NAMES=[['Pavel','Pavla','Pavela'],['Karel','Karla','Karela'],['Marek','Marka','Mareka'],['Petr','Petra','Petre'],['Adam','Adama','Adamu'],['Tomáš','Tomáše','Tomáša'],
+  ['Jana','Janu','Jany'],['Eva','Evu','Evy'],['Lucie','Lucii','Lucií'],['Marie','Marii','Mariu'],['Ondřej','Ondřeje','Ondřeja']];
+const ACC_E={mz:'Одушевлённый мужской: A = G (-a, у мягких -e).',mn:'Неодушевлённый мужской: A = N.',f:'Женский род: -a → -u, -e → -i, на согласную A = N.',n:'Средний род: A = N.'};
+G.l3r3=R(
+  [7,()=>{const [fr,tags,o]=pick(ACC_FR),n=pick(accNouns(tags)),m=n.tags.includes('city')||n.tags.includes('name')?{}:mods(n,{own:o.own});
+    return write(`${fr} (${nom(n,m)})`,phrase(n,'A',m),ACC_E[n.g])}],
+  [2,()=>{const [n,a,w]=pick(ACC_NAMES);return choice(`Znáš ___?`,[a,n,w],a)}]
+);
+
+const LIKE=[['sport','sportovat','sportuju','sportuje','sportujeme'],['kávu','pít','piju','pije','pijeme'],['hudbu','poslouchat','poslouchám','poslouchá','posloucháme'],
+  ['zmrzlinu','jíst','jím','jí','jíme'],['knihy','číst','čtu','čte','čteme'],['čaj','pít','piju','pije','pijeme'],['zeleninu','jíst','jím','jí','jíme']];
+const LIKE_S=[{t:'Mám rád',i:0,x:2},{t:'Mám ráda',i:0,x:2},{t:'Jana má ráda',i:2,x:3},{t:'Petr má rád',i:2,x:3},{t:'Máme rádi',i:3,x:4}];
+G.l3r4=R(
+  [2,()=>{const l=pick(LIKE),s=pick(LIKE_S);return choice(`${s.t} ___.`,[l[0],l[1],l[s.x]],l[0],'mít rád + существительное в аккузативе; с глаголом — просто rád.')}],
+  [2,()=>{const g=pick(['m','f']),v=pick(['sportovat','tancovat','vařit','zpívat','cestovat','nakupovat']),f=forms(v,0)[0],r=RAD[g];
+    return choice(`___ ${f}. (я — ${g==='m'?'мужчина':'женщина'})`,[cap(r),'Mám '+r,'Mám '+RAD[g==='m'?'f':'m']],cap(r),'С глаголом — просто rád / ráda, без mít.')}],
+  [2,()=>{const s=pick([{t:'Jana',g:'f',m:'má'},{t:'Petr',g:'m',m:'má'},{t:'Eva a Petr',g:'pl',m:'mají'},{t:'Moje sestra',g:'f',m:'má'}]),n=pick(accNouns(['food','drink','top']));
+    return choice(`${s.t} ___ ${n.f.A[0]}.`,[`${s.m} ${RAD[s.g]}`,RAD[s.g],s.g==='m'?'ráda':'rád'],`${s.m} ${RAD[s.g]}`)}],
+  [3,()=>{const s=pick(['Má ráda','Nemám rád','Máme rádi','Petr má rád','Mají rádi','Nemáš ráda']),n=pick(accNouns(['food','drink','top','city']).concat(NN['babička'],NN['dědeček'],NN['pes']));
+    return write(`${s} ___. (${n.nom})`,n.f.A)}],
+  [2,()=>{const s=pick([{t:'Vy nemáte',g:'pl',h:'вы, мн. ч.',q:'?'},{t:'Petr nemá',g:'m',q:'.'},{t:'Jana nemá',g:'f',q:'.'},{t:'Oni mají',g:'pl',q:'.'},{t:'My máme',g:'pl',q:'.'},{t:'Máš',g:'f',h:'ты — женщина',q:'?'}]),
+    n=pick(accNouns(['p']).filter(x=>!x.tags.includes('name')));return choice(`${s.t} ___ ${n.f.A[0]}${s.q}${s.h?` (${s.h})`:''}`,['rád','ráda','rádi'],RAD[s.g],undefined,true)}]
+);
+
+const SESI={'jmenovat se':['Adam','Eva'],'dívat se':['na film','na televizi'],'zajímat se':['o hudbu','o sport'],'učit se':['česky','gramatiku'],'ptát se':['učitele'],
+  'těšit se':['na víkend'],'dát si':['čaj','pivo','kávu','polévku'],'objednat si':['polévku','salát'],'kupovat si':['nový svetr','zmrzlinu'],'přát si':['nové auto','psa'],'povídat si':['s kamarádkou']};
+const SESI_F={'objednat si':['objednám','objednáš','objedná','objednáme','objednáte','objednají'],'dát si':['dám','dáš','dá','dáme','dáte','dají'],'kupovat si':V('kupovat').pres.map(x=>x[0])};
+const sesiForm=(v,i)=>SESI_F[v]?SESI_F[v][i]:forms(v,i)[0];
+const clOf=v=>v.split(' ')[1];
+G.l3r5=R(
+  [5,()=>{const v=pick(Object.keys(SESI)),c=clOf(v),t=pick(SESI[v]),r=Math.random();
+    if(v==='jmenovat se'){const s=pick(PS.filter(x=>x.i<2));return choice(Math.random()<.5?`${cap(sesiForm(v,s.i))} ___ ${t}.`:`Jak ___ ${sesiForm(v,s.i)}?`,['se','si'],c,undefined,true)}
+    if(r<.4){const s=pick(PS);return choice(`${cap(sesiForm(v,s.i))} ___ ${t}.`,['se','si'],c,undefined,true)}
+    if(r<.7){const n=pick(NM.concat(NF));return choice(`${n} ___ ${sesiForm(v,2)} ${t}.`,['se','si'],c,undefined,true)}
+    if(STAT.includes(v)){const s=pick(PS);return choice(`${cap(sesiForm(v,s.i))} ___ ${t}.`,['se','si'],c,undefined,true)}
+    const s=pick(PS),l=pick(['Dnes','Večer','Teď']);return choice(`${l} ___ ${sesiForm(v,s.i)} ${t}.`,['se','si'],c,undefined,true)}],
+  [1,()=>{const s=pick(PS.filter(x=>x.i!==0));return choice(`Jak ___ ${forms('mít',s.i)[0]}?`,['se','si'],'se',undefined,true)}],
+  [2,()=>pick([
+    ()=>order(pick(['Co si dáte, prosím?','Co si dáš?','Jak se máš?'])),
+    ()=>order(`Dám si ${pick(['kávu','čaj','pivo','polévku','salát'])}.`),
+    ()=>{const [a,b]=some(['kávu','čaj','pivo','džus','vodu'],2);return order(`Nedám si ${a}, ale dám si ${b}.`)}])()],
+  [2,()=>{const s=pick(PS.filter(x=>x.i!==0)),n=pick(['pivo','kávu','čaj','polévku','salát','zmrzlinu']),f=sesiForm('dát si',s.i);
+    return Math.random()<.5?write(`___ ${n}? (dát si – ${s.t})`,cap(f)+' si'):write(`Co ___? (dát si – ${s.t})`,'si '+f)}]
+);
+
+// ================= LEKCE 4 =================
+const countable=()=>NOUNS.filter(n=>(n.g==='mn'||n.g==='f'||n.g==='n')&&notName(n)&&!['city','land','subj','top','ev','p','a','money','abs','t2'].some(t=>n.tags.includes(t))&&
+  !['zelenina','maso','cukr','med','voda','mléko','čaj','džus','chléb','sýr','práce','čokoláda','šunka','hudba'].includes(n.nom));
+const NUM24={mz:'dva',mn:'dva',f:'dvě',n:'dvě'};
+const PL_E=n=>n.nom==='stůl'?'stůl → stoly: ů → o.':n.g==='n'&&n.cl==='ni'?'Средний род на -í: pl. = sg.':n.g==='n'?'Средний род: -o → -a.':n.cl==='fs'?'Женский род на -e: pl. = sg.':n.cl==='fc'?'Женский род на мягкую согласную: -e/-ě.':n.cl==='fk'?'Женский род на -ost: -i.':n.cl==='is'?'Мягкий мужской: -e.':undefined;
+G.l4r0=R(
+  [5,()=>{const n=pick(countable()),num=Math.random()<.5?NUM24[n.g]:pick(['tři','čtyři']);return write(`To jsou ${num} ___. (${n.nom})`,n.f.N2,PL_E(n))}],
+  [2,()=>{const n=pick(countable()),A=adjsFor(n).length?adjsFor(n):['nový'],m={d:1,a:pick(A)};return write(`To jsou ___. (${nom(n,m)} → pl.)`,phrase(n,'N2',m))}],
+  [1,()=>{const n=pick(countable()),A=adjsFor(n).length?adjsFor(n):['nový'],a=pick(A);return write(`${cap(ten('N2',n.g))} ${n.f.N2[0]} jsou ___. (${a})`,adj(a,'N2',n.g),'Прилагательные во мн. ч.: M и F -é, Neu -á.')}],
+  [2,()=>{const n=pick(countable());return choice(`To jsou ___ ${n.f.N2[0]}.`,['dva','dvě'],NUM24[n.g],'dva — мужской род, dvě — женский и средний.',true)}]
+);
+
+const ACCPL_FR=[['Znám ___.',['p']],['Hledám ___.',['p','t']],['Čekáme na ___.',['p']],['Vidím ___.',['p','a']],['Mám rád ___.',['p','food']]];
+const portable=()=>countable().filter(x=>['t','clo','fur','wr'].some(t=>x.tags.includes(t))&&!x.tags.includes('pl'));
+const plPeople=()=>persons().filter(n=>!['pán','manžel'].includes(n.nom));
+G.l4r1=R(
+  [4,()=>{const [fr,tags]=pick(ACCPL_FR),n=pick(tags.includes('p')?plPeople().concat(tags.length>1?countable():[]):countable());return write(`${fr} (${n.nom} — pl.)`,n.f.A2)}],
+  [2,()=>{const n=pick(T('fam','a').concat(countable()).filter(x=>!['dítě','pán','manžel','manželka','matka','otec'].includes(x.nom)));return write(`Mám ${NUM24[n.g]} ___. (${n.nom})`,n.f.A2)}],
+  [2,()=>{const p=Math.random()<.5,n=pick(p?plPeople():portable()),a=pick(adjsFor(n).length?adjsFor(n):['nový']);return write(`${pick(p?['Znám','Hledám']:['Hledám','Mám','Potřebuju'])} dva ___. (${adj(a,'N',n.g)} ${n.nom})`.replace('dva',NUM24[n.g]),combos([adj(a,'A2',n.g),n.f.A2]))}],
+  [1,()=>{const n=pick(plPeople().concat(countable()));return write(`${n.tags.includes('p')?'Znáš':'Potřebujete'} ty ___? (${n.nom} — pl.)`,n.f.A2)}]
+);
+
+const IT={mluvit:['česky','anglicky','rusky'],prosit:['o pomoc'],vařit:['večeři','oběd','polévku'],'učit se':['česky','gramatiku'],platit:['kartou','v restauraci'],
+  'těšit se':['na víkend','na prázdniny'],myslet:['na dovolenou'],vidět:['dobře','tu horu'],sedět:['v parku','doma'],ležet:['v posteli'],slyšet:['hudbu','dobře'],
+  bydlet:['v Praze','tady','v Brně'],rozumět:['česky','dobře'],umět:['česky','vařit','plavat'],spát:['dobře','dlouho'],jíst:['maso','zeleninu','rohlík'],vědět:['to','všechno']};
+G.l4r2=R(
+  [6,()=>conjTask(IT)],
+  [2,()=>{const v=pick(Object.keys(IT).filter(x=>!V(x).refl)),s=pick(PS);return write(`${s.t} ___ (${v}) — negace`,forms(v,s.i).map(neg))}],
+  [2,()=>{const v=pick(Object.keys(IT).filter(x=>!V(x).refl)),[s,i]=pick(S2),f=forms(v,i);return choice(`${s} ___ ${pick(IT[v])}.`,[f[0],...others(V(v).pres.map(x=>x[0]),f,2)],f[0])}]
+);
+
+// personal pronouns in the accusative: frames with the subject's person, so «já» never meets «já»
+const PA_SHORT=[['Vidíme ___.',3],['Hledáte ___?',4],['Známe ___.',3],['Petr ___ zná.',2],['Jana ___ hledá.',2],['Slyšíš ___?',1],['Vidíš ___?',1],['Čekají ___.',5]];
+const PA_LONG=[['Čekáme na ___.',3],['Dívají se na ___.',5],['Myslím na ___.',0],['Zajímá se o ___.',2],['Máš pro ___ dárek?',1],['Těšíš se na ___?',1],['To je dárek pro ___.',-1],['Starám se o ___.',0]];
+const PR_I={'já':0,'ty':1,'on':2,'ona':2,'my':3,'vy':4,'oni':5};
+const prFor=(subj,skip=[])=>pick(Object.keys(PRON).filter(p=>PR_I[p]!==subj&&!skip.includes(p)));
+G.l4r3=R(
+  [4,()=>{const [f,s]=pick(PA_SHORT),p=prFor(s);return write(`${f} (${p})`,alts(PRON[p].A),'Без предлога — краткая форма.')}],
+  [4,()=>{const [f,s]=pick(PA_LONG),p=prFor(s);return write(`${f} (${p})`,alts(PRON[p].Ap),'После предлога — длинная форма, j → ň.')}],
+  [2,()=>{const n=pick(T('fam','t').concat(NN['město'],NN['auto'])),o=pick(['můj','náš','tvůj']),pr={mz:'ho',mn:'ho',n:'ho',f:'ji'}[n.g];
+    const fr=n.tags.includes('p')?pick(['Znáte ___?','Vidíš ___?','Hledáš ___?']):pick(['Mám ___ moc rád.','Hledáš ___?','Vidíš ___?']);
+    return write(`To je ${poss(o,'N',n.g).split('/')[0]} ${n.nom}. ${fr}`,pr,n.g==='f'?'Женский род → ji.':'Мужской и средний род → ho.')}]
+);
+
+const PA4=[
+  ()=>{const n=pick(accNouns(['p','tr']));return choice(`Čekám ___ ${n.f.A[0]}.`,['na','o','pro'],'na','čekat na + A.')},
+  ()=>choice(`Dívám se ___ ${pick(['nový film','televizi','ten obraz','fotbal'])}.`,['na','o','v'],'na','dívat se na + A.'),
+  ()=>choice(`Těším se ___ ${pick(['víkend','koncert','výlet','dovolenou','večeři'])}.`,['na','o','pro'],'na','těšit se na + A.'),
+  ()=>{const n=pick(accNouns(['top']));return choice(`Zajímám se ___ ${n.f.A[0]}.`,['na','o','pro','za'],'o','zajímat se o + A.')},
+  ()=>choice('___ co se zajímáš?',['Na','O','Pro','Za'],'O','zajímat se o + A.'),
+  ()=>{const n=pick(T('fam','a'));return choice(`Starám se ___ ${n.f.A[0]}.`,['na','o','pro'],'o','starat se o + A.')},
+  ()=>{const n=pick(persons());return choice(`To je dárek ___ ${n.f.A[0]}.`,['na','o','pro','za'],'pro','pro + A — для кого.')},
+  ()=>choice(`${pick(['Tričko','Ta kniha','Ten svetr','Lístek'])} je ___ ${pick(['990','150','300','45'])} korun.`,['na','pro','za','v'],'za','za + A — за сколько (цена).'),
+  ()=>choice(`Děkuju ___ ${pick(['dárek','pomoc','večeři','oběd','tu knihu'])}.`,['na','o','pro','za'],'za','děkovat za + A.'),
+  ()=>choice(`Film začíná ___ ${pick(['deset minut','hodinu','chvíli','pět minut'])}.`,['na','o','pro','za'],'za','za + A — через (время).'),
+  ()=>{const d=pick(DAYS);return choice(`___ ${d.A} jdu do kina.`,['V','Ve','Za'],cap(d.v),'v + A — когда (день недели), ve перед st-, čt-.')},
+  ()=>choice(`Obědvám ___ poledne.`,['na','o','v','za'],'v','v poledne — в полдень.'),
+  ()=>choice('Potřebuju sešit ___ gramatiku.',['na','o','v'],'na','na + A — для чего.')
+];
+G.l4r4=()=>pick(PA4)();
+const DAYS=[{N:'pondělí',G:'pondělí',A:'pondělí',v:'v'},{N:'úterý',G:'úterý',A:'úterý',v:'v'},{N:'středa',G:'středy',A:'středu',v:'ve'},{N:'čtvrtek',G:'čtvrtka',A:'čtvrtek',v:'ve'},
+  {N:'pátek',G:'pátku',A:'pátek',v:'v'},{N:'sobota',G:'soboty',A:'sobotu',v:'v'},{N:'neděle',G:'neděle',A:'neděli',v:'v'}];
+
+// time: hours 1–12, minutes
+const NUMW=['','jedna','dvě','tři','čtyři','pět','šest','sedm','osm','devět','deset','jedenáct','dvanáct'];
+const MINW={0:'',1:'jedna minuta',2:'dvě minuty',3:'tři minuty',4:'čtyři minuty',5:'pět minut',10:'deset minut',15:'patnáct minut',20:'dvacet minut',25:'dvacet pět minut',
+  30:'třicet minut',40:'čtyřicet minut',45:'čtyřicet pět minut',50:'padesát minut'};
+const hodF=h=>h===1?'hodina':h<5?'hodiny':'hodin';
+const timeStr=(h,m)=>`${h>1&&h<5?'Jsou':'Je'} ${NUMW[h]} ${hodF(h)}${m?' '+MINW[m]:''}`;
+const ATW=['','v jednu hodinu','ve dvě hodiny','ve tři hodiny','ve čtyři hodiny','v pět hodin','v šest hodin','v sedm hodin','v osm hodin','v devět hodin','v deset hodin','v jedenáct hodin','ve dvanáct hodin'];
+const RUH=h=>`${h} ${h===1?'час':h<5?'часа':'часов'}`;
+G.l4r5=R(
+  [4,()=>{const h=1+Math.random()*12|0,m=pick([0,0,0,...Object.keys(MINW).map(Number)]),right=timeStr(h,m);
+    const v=h>1&&h<5?'Jsou':'Je',vw=v==='Je'?'Jsou':'Je',hf=hodF(h),hw=pick(['hodina','hodiny','hodin'].filter(x=>x!==hf)),mt=m?' '+MINW[m]:'';
+    const wr=[`${vw} ${NUMW[h]} ${hf}${mt}`,`${v} ${NUMW[h]} ${hw}${mt}`,`${vw} ${NUMW[h]} ${hw}${mt}`];if(h===2)wr.push(`${v} dva ${hf}${mt}`);
+    return choice(`${h}:${String(m).padStart(2,'0')}`,[right,...some(wr,2)],right,'1 — je jedna hodina, 2–4 — jsou … hodiny, 5 и больше — je … hodin.')}],
+  [3,()=>{const h=1+Math.random()*12|0,r=ATW[h],v=pick(['Vstávám','Obědváme','Snídám','Končím','Začínáme','Večeříme']);
+    const sw=r.startsWith('ve ')?r.replace(/^ve /,'v '):r.replace(/^v /,'ve '),hw=r.replace(/hodin$|hodiny$|hodinu$/,h<5&&h>1?'hodin':'hodiny');
+    return choice(`${v} ___. (в ${RUH(h)})`,[r,sw,hw],r,'V kolik? — v + A: v jednu hodinu, ve dvě hodiny, v pět hodin.')}],
+  [2,()=>{const h=1+Math.random()*12|0;return write(`${h>1&&h<5?'Jsou':'Je'} ${NUMW[h]} ___. (hodina)`,hodF(h))}],
+  [1,()=>{const m=pick([1,2,3,4,5,10,20]),w=MINW[m].split(' ');return write(`Je pět hodin ${w[0]} ___. (minuta)`,w[1])}]
+);
+
+const VOC4=[['Pavel','Pavle'],['Karel','Karle']].map(([n,v])=>[n,v,'-el: e выпадает, -el → -le.','i'])
+  .concat([['Radek','Radku'],['Marek','Marku'],['Hynek','Hynku'],['Vašek','Vašku']].map(([n,v])=>[n,v,'-ek: e выпадает, -ek → -ku.','i']))
+  .concat([['Zdeněk','Zdeňku','-něk → -ňku.','i'],['Luděk','Luďku','-děk → -ďku.','i'],['dědeček','dědečku','-ek → -ku.','i'],['tatínek','tatínku','-ek → -ku.','i'],
+    ['pan Štěpánek','pane Štěpánku','-ek → -ku, pan → pane.','f'],['pan Havel','pane Havle','-el → -le, pan → pane.','f'],['pan Hašek','pane Hašku','-ek → -ku, pan → pane.','f'],['pan Kubíček','pane Kubíčku','-ek → -ku, pan → pane.','f']]);
+G.l4r6=vocTask(VOC4);
+
+const ZE_N=['je doma','je tady nový učitel','Petr nemá čas','ten film je dobrý','mluví dobře česky','bydlí blízko','je to pravda','autobus jede v osm'];
+const ZE_P=['jsi tady','máš čas','je dnes hezký den','máme nový byt','to umíš','jsi zdravý'];
+const ZE_O=[['Vím, že David rád sportuje.',['Vím, že David sportuje rád.']],['Jsem rád, že jsi tady.',['Jsem rád, že tady jsi.']],['Myslím, že je doma.',[]],
+  ['Myslíte, že je pan Merlík dobrý ředitel?',['Myslíte, že pan Merlík je dobrý ředitel?']],['Petr říká, že nemá čas.',['Petr říká, že čas nemá.']],['Vím, že bydlíš v Praze.',['Vím, že v Praze bydlíš.']],
+  ['Myslím, že ten film je dobrý.',['Myslím, že je ten film dobrý.']],['Jsem ráda, že máš čas.',['Jsem ráda, že čas máš.']],['Jana říká, že je unavená.',[]]];
+G.l4r7=R(
+  [3,()=>{const pos=Math.random()<.4,main=pos?pick(['Jsem rád','Jsem ráda','Jana je ráda','Jsme rádi']):pick(['Vím','Myslím','Petr říká','Jana říká']),c=pick(pos?ZE_P:ZE_N);
+    return choice(`${main}, ___ ${c}.`,['že','a','ale'],'že',undefined,true)}],
+  [2,()=>{const [a,alt]=pick(ZE_O);return order(a,alt)}],
+  [1,()=>choice(`Myslíte, ___ ${pick(ZE_N)}?`,['že','a','ale'],'že',undefined,true)]
+);
+
+const HLE={mz:'Tenhle',mn:'Tenhle',f:'Tahle',n:'Tohle'},HLE_A={mn:'tenhle',f:'tuhle',n:'tohle'};
+const hleThings=()=>countable().filter(x=>x.tags.includes('clo')||x.tags.includes('t'));
+G.l4r8=R(
+  [2,()=>{const n=pick(hleThings());return choice(`Kolik stojí ___ ${n.nom}?`,['tenhle','tahle','tohle'],HLE[n.g].toLowerCase(),undefined,true)}],
+  [2,()=>{const n=pick(persons().concat(hleThings()));return choice(`___ ${n.nom} je tady.`,['Tenhle','Tahle','Tohle'],HLE[n.g],undefined,true)}],
+  [3,()=>{const n=pick(hleThings()),clo=n.tags.includes('clo'),wrong={mn:['tuhle','tohle'],f:['tahle','tohle'],n:['tenhle','tuhle']}[n.g];
+    return choice(`${pick(clo?['Zkusím si','Vezmu si','Chci']:['Vezmu si','Chci','Koupím si'])} ___ ${n.f.A[0]}.`,[HLE_A[n.g],...wrong],HLE_A[n.g],n.g==='f'?'Akuzativ F: tuhle.':'Склоняется только первая часть: tenhle, tuhle, tohle.')}],
+  [2,()=>{const n=pick(hleThings().filter(x=>x.g!=='n'));return choice(`${n.tags.includes('clo')?'Zkusím si':'Vezmu si'} ___ ${NUM24[n.g]} ${n.f.N2[0]}.`,['tenhle','tyhle','tohle'],'tyhle','Мн. ч.: tyhle.',true)}]
+);
+
+// ================= LEKCE 5 =================
+const PSAT={psát:['dopis','e-mail','úkol'],číst:['knihu','noviny'],pít:['kávu','čaj','vodu'],mýt:['auto','okna','nádobí'],jít:['do školy','do kina','domů','na poštu'],
+  jet:['do Brna','autem','na hory'],'přát si':['nové auto','dárek'],žít:['v Praze','v Brně'],hrát:['fotbal','tenis','na kytaru']};
+G.l5r0=R(
+  [6,()=>conjTask(PSAT)],
+  [2,()=>{const v=pick(Object.keys(PSAT).filter(x=>!V(x).refl)),s=pick(PS);return write(`${s.t} ___ (${v}) — negace`,forms(v,s.i).map(neg))}],
+  [1,()=>{const s=pick([['paní Vlasáková',4],['pane Nový',4],['Petře',1],['Jano',1]]);return write(`Co si ___, ${s[0]}? (přát si – ${s[1]===4?'vy':'ty'})`,forms('přát si',s[1]))}],
+  [3,()=>{const s=anySubj(),walk=Math.random()<.5,d=walk?pick(['do školy','do bazénu','do kina','na poštu','do parku','do obchodu']):pick(['do Brna','do Prahy','na hory','na chatu','do Německa','do centra','na nádraží','na letiště']),
+    city=!walk&&/centra|nádraží|letiště/.test(d),how=walk?'pěšky':city?pick(['tramvají','metrem','autobusem']):pick(['autem','vlakem','autobusem','']);
+    const fj=forms('jít',s.i)[0],fe=forms('jet',s.i)[0],far=!walk&&!how;
+    return choice(`${cap(s.t)} ___ ${d}${how?' '+how:''}.`,[fj,fe],walk?fj:fe,walk?'Пешком — jít.':far?'Далеко — jet.':'На транспорте — jet.',true)}]
+);
+
+// ================= LEKCE 5 (dál) =================
+const DO_PL=['škola','banka','kino','divadlo','obchod','restaurace','kavárna','knihovna','supermarket','nemocnice','kancelář','práce','park','bazén','hotel','kostel'];
+const NA_PL=['pošta','letiště','univerzita','náměstí','nádraží','koncert','oběd','výlet','zastávka','zahrada','večeře','chata','návštěva'];
+const NEAR=['park','kostel','škola','nádraží','banka','pošta','náměstí','divadlo','nemocnice','supermarket','zastávka','kino'];
+const genFr=[
+  ()=>{const n=NN[pick(DO_PL)],m=mods(n,{adjP:.3});return write(`${pick(['Jdu','Jdeme','Spěchám','Jedu'])} do ___. (${nom(n,m)})`,phrase(n,'G',m),'do + G.')},
+  ()=>{const n=pick(T('city','land'));return write(`${pick(['Jedeme','Jedu','Letíme'])} do ___. (${n.nom})`,n.f.G,'do + G.')},
+  ()=>{const n=pick(T('city','land')),s=pick(['Olga je','Jsem','Petr je','Jsme']);return write(`${s} ${zZe(n.f.G[0])} ___. (${n.nom})`,n.f.G,'z + G: откуда.')},
+  ()=>{const n=NN[pick(NEAR)],m=mods(n,{adjP:.25});return write(`Bydlím ${pick(['blízko','vedle'])} ___. (${nom(n,m)})`,phrase(n,'G',m))},
+  ()=>{const d=pick(['kávu','čaj']),n=NN[pick(d==='čaj'?['cukr','citron','med','mléko']:['cukr','mléko'])];return write(`Dám si ${d} bez ___. (${n.nom})`,n.f.G,'bez + G.')},
+  ()=>{const n=NN[pick(['chléb','rohlík'])];return write(`Nejím polévku bez ___. (${n.nom})`,n.f.G,n.nom==='chléb'?'chléb → chleba.':undefined)},
+  ()=>{const n=pick(T('p').filter(x=>['doktor','lékař','kamarád','babička','sestra','kamarádka','doktorka','bratr','dědeček'].includes(x.nom))),s=pick(['Dědeček je','Jsem','Petr je','Jsme']);return write(`${s} u ___. (${n.nom})`,n.f.G,'u + G: у кого.')},
+  ()=>{const n=pick(tagged('p').filter(x=>x.nom!=='dítě'));return write(`${pick(['Ptám se','Zeptám se','Ptáme se'])} ___. (${n.nom})`,n.f.G,'ptát se + G.')},
+  ()=>{const n=NN[pick(['zkouška','pes','doktor','test'])];return write(`${pick(['Bojím se','Nebojím se','Bojíš se'])} ___. (${n.nom})`,n.f.G,'bát se + G.')},
+  ()=>{const d=pick(DAYS.slice(1));return write(`Pracujeme od pondělí do ___. (${d.N})`,d.G,'od … do + G.')},
+  ()=>{const n=pick(T('p').filter(x=>['doktor','lékař','kamarád','babička','kamarádka','doktorka'].includes(x.nom)));return write(`Jdu od ___. (${n.nom})`,n.f.G,'od + G: от человека.')},
+  ()=>{const n=NN[pick(['škola','práce','kino','divadlo','obchod','banka'])];return write(`Jdu ${zZe(n.f.G[0])} ___. (${n.nom})`,n.f.G,'z + G: из места.')}];
+G.l5r1=R(
+  [8,()=>pick(genFr)()],
+  [2,()=>{const p=Math.random()<.5;if(p){const n=pick(T('p').filter(x=>['doktor','lékař','kamarád','babička','kamarádka'].includes(x.nom)));return choice(`Jdu ___ ${n.f.G[0]}. (откуда)`,['z','od','do'],'od','От человека — od, из места — z.',true)}
+    const n=NN[pick(['škola','práce','kino','banka','obchod','divadlo'])],z=zZe(n.f.G[0]);return choice(`Jdu ___ ${n.f.G[0]}. (откуда)`,[z,'od','do'],z,'Из места — z, от человека — od.',true)}]
+);
+
+G.l5r2=()=>{
+  const na=Math.random()<.5,n=NN[pick(na?NA_PL:DO_PL)],f=na?n.f.A[0]:n.f.G[0];
+  const far=['letiště','chata'].includes(n.nom),ev=n.tags.includes('ev'),v=far?pick(['Jedu','Jedeme','Potřebuju jet']):ev?pick(['Jdu','Jdeme','Spěchám','Jdete','Kdy jdeš']):pick(['Jdu','Jdeme','Spěchám','Jdete','Kdy jdeš','Jak se dostanu']);
+  const q=/^(Kdy|Jak)/.test(v)||v==='Jdete'?'?':'.';
+  return choice(`${v} ___ ${f}${q}`,['na','do'],na?'na':'do',na?'na + A: учреждения, мероприятия, открытые места.':'do + G: внутрь здания.',true);
+};
+
+const KAM=[['Dám knihu na ___.',['stůl','židle','postel','skříň','gauč','křeslo']],['Dám tašku pod ___.',['stůl','židle','postel','gauč']],['Pověsím obraz nad ___.',['postel','gauč','stůl','okno','křeslo']],
+  ['Jdu před ___.',['banka','škola','dům','divadlo','kino','nádraží','kostel']],['Autobus jede za ___.',['dům','banka','škola','kostel','most']],['Půjdete pod ___.',['most']],
+  ['Postavím auto před ___.',['dům','hotel','škola']]];
+G.l5r3=R(
+  [5,()=>{const [f,list]=pick(KAM),n=NN[pick(list)],m=Math.random()<.3?{d:1}:{};return write(`${f} (${nom(n,m)})`,phrase(n,'A',m),'Куда? → akuzativ.')}],
+  [1,()=>{const [a,b]=some(['postel','stůl','skříň','okno','gauč'],2);return write(`Dáme židli mezi ${NN[a].f.A[0]} a ___. (${b})`,NN[b].f.A,'mezi + A, когда «куда».')}]
+);
+
+const MOD_TAIL={moct:['přijít zítra','tady parkovat','mluvit česky','jít s námi'],muset:['jít domů','studovat','pracovat','vstávat brzo'],chtít:['jet do Prahy','spát','jíst','koupit nové auto']};
+const MOD_C=[['V neděli ___ studovat, protože mám zkoušku.','muset',0],['Mám zkoušku, ___ se učit.','muset',0],['Autobus jede v sedm, ___ vstávat v šest.','muset',0],
+  ['___ tady telefonovat? — Ano, můžeš.','moct',0],['___ tady parkovat? — Ano, můžete.','moct',3],['Nemám auto, ale ___ jet tramvají.','moct',0],
+  ['Promiň, dnes ne___ přijít, jsem nemocný.','moct',0],['Tady ne___ parkovat, je tu zákaz.','moct',4],['Je to zadarmo, ne___ platit.','muset',4],
+  ['___ jet k moři, je tam krásně!','chtít',0],['Co si ___ dát? — Kávu, prosím.','chtít',4],['Co ___ k narozeninám? — Nové kolo.','chtít',1]];
+G.l5r4=R(
+  [3,()=>{const v=pick(['moct','muset','chtít']),s=pick(PS);return write(`${s.t} ___ (${v})`,forms(v,s.i))}],
+  [3,()=>{const v=pick(['moct','muset','chtít']),s=anySubj();return write(`${cap(s.t)} ___ ${pick(MOD_TAIL[v])}. (${v})`,forms(v,s.i))}],
+  [1,()=>{const v=pick(['moct','muset','chtít']),s=pick(PS);return write(`${s.t} ___ (${v}) — negace`,forms(v,s.i).map(neg))}],
+  [3,()=>{const [q,v,i]=pick(MOD_C),ng=q.includes('ne___'),start=q.startsWith('___'),f=x=>{const w=(ng?'ne':'')+forms(x,i)[0];return start?cap(w):w};
+    return choice(q.replace('ne___','___'),['moct','muset','chtít'].map(f),f(v))}]
+);
+
+// ================= LEKCE 6 =================
+const ASP=[['dělat','udělat'],['číst','přečíst'],['psát','napsat'],['vařit','uvařit'],['kupovat','koupit'],['ptát se','zeptat se'],['učit se','naučit se'],['jíst','sníst'],
+  ['vstávat','vstát'],['čekat','počkat'],['pít','vypít'],['platit','zaplatit'],['volat','zavolat'],['uklízet','uklidit'],['posílat','poslat'],['zavírat','zavřít']];
+// present forms of the perfective verbs (their future)
+const PF={udělat:'udělám,uděláš,udělá,uděláme,uděláte,udělají',přečíst:'přečtu,přečteš,přečte,přečteme,přečtete,přečtou',napsat:'napíšu/napíši,napíšeš,napíše,napíšeme,napíšete,napíšou/napíší',
+  uvařit:'uvařím,uvaříš,uvaří,uvaříme,uvaříte,uvaří',koupit:'koupím,koupíš,koupí,koupíme,koupíte,koupí','zeptat se':'zeptám,zeptáš,zeptá,zeptáme,zeptáte,zeptají',
+  'naučit se':'naučím,naučíš,naučí,naučíme,naučíte,naučí',sníst:'sním,sníš,sní,sníme,sníte,snědí',vstát:'vstanu,vstaneš,vstane,vstaneme,vstanete,vstanou',
+  počkat:'počkám,počkáš,počká,počkáme,počkáte,počkají',vypít:'vypiju/vypiji,vypiješ,vypije,vypijeme,vypijete,vypijou/vypijí',zaplatit:'zaplatím,zaplatíš,zaplatí,zaplatíme,zaplatíte,zaplatí',
+  zavolat:'zavolám,zavoláš,zavolá,zavoláme,zavoláte,zavolají',uklidit:'uklidím,uklidíš,uklidí,uklidíme,uklidíte,uklidí',poslat:'pošlu,pošleš,pošle,pošleme,pošlete,pošlou',
+  zavřít:'zavřu,zavřeš,zavře,zavřeme,zavřete,zavřou',skončit:'skončím,skončíš,skončí,skončíme,skončíte,skončí',dát:'dám,dáš,dá,dáme,dáte,dají',
+  otevřít:'otevřu,otevřeš,otevře,otevřeme,otevřete,otevřou'};
+const IPF_X={volat:'volám,voláš,volá,voláme,voláte,volají',uklízet:'uklízím,uklízíš,uklízí,uklízíme,uklízíte,uklízejí/uklízí',posílat:'posílám,posíláš,posílá,posíláme,posíláte,posílají',
+  zavírat:'zavírám,zavíráš,zavírá,zavíráme,zavíráte,zavírají'};
+const pfF=(v,i)=>alts(PF[v].split(',')[i]);
+const ipfF=(v,i)=>IPF_X[v]?alts(IPF_X[v].split(',')[i]):forms(v,i);
+// objects: [for a habit, for one finished action]
+const ASP_OBJ={dělat:['úkoly','ten úkol'],číst:['noviny','tu knihu'],psát:['e-maily','ten dopis'],vařit:['večeři','polévku'],kupovat:['chleba','dárek pro mámu'],'ptát se':['učitele','učitele'],
+  'učit se':['nová slova','ta nová slova'],jíst:['polévku','ten dort'],vstávat:['v sedm hodin'],čekat:['na autobus','na tebe'],pít:['kávu','tu kávu'],platit:['kartou','účet'],
+  volat:['mamince','mamince'],uklízet:['pokoj','byt'],posílat:['e-maily','ten dopis'],zavírat:['okno','okno']};
+const ASP_IPF=['Každý den','Obvykle','Často','Vždycky','Každý večer'],ASP_PF=['Do večera','Za chvíli','Zítra'];
+const PS1=PS.filter(x=>x.t!=='ona'&&!(x.i<2&&x.g==='f'));
+G.l6r0=R(
+  [1,()=>pairs(some(ASP,5))],
+  [5,()=>{const [ipf,pf]=pick(ASP),hab=Math.random()<.5||ipf==='vstávat',s=pick(PS1),obj=ASP_OBJ[ipf][hab?0:1];
+    const lead=hab?pick(ASP_IPF):pick(['pít','jíst'].includes(ipf)?['Za chvíli']:ipf==='čekat'?['Zítra']:ASP_PF),refl=ipf.split(' ')[1]||'',fi=ipfF(ipf,s.i)[0],fp=pfF(pf,s.i)[0];
+    return choice(`${lead}${refl?' '+refl:''} ___ ${obj}.${s.i?` (${s.t})`:''}`,[fi,fp],hab?fi:fp,hab?'Повторение, привычка — несовершенный вид.':'Один раз, с результатом в будущем — совершенный вид.',true)}],
+  [1,()=>{const s=pick(PS1);return choice(`Teď ___ knihu, neruš mě.${s.i?` (${s.t})`:''}`,[forms('číst',s.i)[0],pfF('přečíst',s.i)[0]],forms('číst',s.i)[0],'Процесс сейчас — несовершенный вид.',true)}],
+  [1,()=>{const x=pick(['bydlet','mít','znát','umět','vědět','muset','chtít','být']);return choice('Какой глагол только несовершенный?',[x,...some(['udělat','koupit','napsat','přečíst','uvařit','zavolat','vypít','sníst','uklidit','zaplatit'],3)],x,'У модальных глаголов, být, mít, bydlet, znát и др. нет пары совершенного вида.')}]
+);
+
+const PF_OBJ={uvařit:['oběd','večeři','polévku'],přečíst:['tu knihu','ten článek'],koupit:['nové auto','dárek','chleba'],napsat:['ten mail','dopis','úkol'],vstát:['v deset hodin','brzo'],
+  'zeptat se':['učitele','paní Novákové'],udělat:['ten úkol','test'],zavolat:['mamince','babičce'],zaplatit:['kartou','účet'],vypít:['tu kávu','ten čaj'],sníst:['ten dort','oběd'],
+  počkat:['na tebe','na autobus'],'naučit se':['nová slova','tu báseň'],uklidit:['pokoj','byt'],poslat:['ten dopis','fotky'],otevřít:['okno','dveře'],zavřít:['okno','dveře']};
+const PF_TIME=['Zítra','V sobotu','Za hodinu','Potom','V pondělí'];
+G.l6r1=R(
+  [7,()=>{const v=pick(Object.keys(PF_OBJ)),s=pick(PS),refl=v.includes(' ')?v.split(' ')[1]:'',q=Math.random()<.25;
+    const obj=pick(PF_OBJ[v]),f=pfF(v,s.i);
+    if(q)return write(`Kdy ${refl?refl+' ':''}___ ${obj}? (${v} – ${s.t})`,f);
+    return write(`${pick(v==='vstát'?['Zítra','V sobotu','V pondělí']:PF_TIME)} ${refl?refl+' ':''}___ ${obj}. (${v} – ${s.t})`,f,'Совершенный вид в настоящей форме = будущее время.')}],
+  [2,()=>{const x=pick([['film','skončit'],['koncert','skončit'],['škola','skončit'],['film','začít'],['zkouška','začít']]),v=x[1],n=NN[x[0]]||{nom:x[0]};
+    const f=v==='začít'?'začne':'skončí';return write(`V kolik hodin ___ ${x[0]==='škola'?'škola':x[0]==='zkouška'?'zkouška':'ten '+x[0]}? (${v})`,f)}]
+);
+
+const MEAS=[['kilo',['cukr','sýr','maso']],['litr',['mléko','voda','víno','pivo','džus']],['hrnek',['čaj','káva','mléko']],['sklenice',['voda','víno','džus','mléko','pivo']],
+  ['kousek',['dort','chléb','sýr','koláč','čokoláda','maso']],['trochu',['polévka','voda','cukr','mléko','čaj']],['láhev',['víno','voda','pivo','mléko']],['talíř',['polévka']],
+  ['deset deka',['sýr','šunka']],['dvě deci',['víno','džus','mléko']]];
+const OWNER=['dědeček','babička','Eva','Petr','Tomáš','sestra','bratr','kamarád','kamarádka','učitel','soused','sousedka','maminka','tatínek','Lucie','Jana'];
+G.l6r2=R(
+  [5,()=>{const [m,list]=pick(MEAS),n=NN[pick(list)],A=ADJ_FOR[n.nom],md=A&&Math.random()<.3?{a:pick(A)}:{};return write(`${m} ___ (${nom(n,md)})`,phrase(n,'G',md),'Количество + G.')}],
+  [3,()=>{const o=NN[pick(OWNER)],t=pick(['auto','pokoj','kniha','taška','mobil','kolo','dům','pes','počítač','učebnice']);return write(`To je ${t} ___. (${o.nom})`,o.f.G,'Чей? — G после существительного.')}],
+  [1,()=>{const s=NN[pick(['čeština','angličtina','matematika','hudba','historie'])],w=pick(['Lucie je učitelka','Pan Novák je učitel','To je učebnice']);return write(`${w} ___. (${s.nom})`,s.f.G)}],
+  [1,()=>{const c=pick(T('city','land').concat(NN['Evropa']||[]));return write(`To je mapa ___. (${c.nom})`,c.f.G)}],
+  [1,()=>{const x=pick([['čas','potřebujete'],['cukr','chcete'],['mléko','potřebujete']]),n=NN[x[0]];return write(`Kolik ___ ${x[1]}? (${n.nom})`,n.f.G)}]
+);
+
+const ORD=['','první','druhý','třetí','čtvrtý','pátý','šestý','sedmý','osmý','devátý','desátý','jedenáctý','dvanáctý','třináctý','čtrnáctý','patnáctý','šestnáctý','sedmnáctý','osmnáctý','devatenáctý','dvacátý'];
+const ORD10={2:'dvacátý',3:'třicátý',4:'čtyřicátý',5:'padesátý',6:'šedesátý',7:'sedmdesátý',8:'osmdesátý',9:'devadesátý'};
+const UNIT_A=['','jedena','dvaa','třia','čtyřia','pěta','šesta','sedma','osma','devěta'];
+// every right way to say an ordinal: 43 → čtyřicátý třetí / třiačtyřicátý
+function ord(n){
+  if(n<=20)return [ORD[n]];
+  const t=n/10|0,u=n%10;if(!u)return [ORD10[t]];
+  return [ORD10[t]+' '+ORD[u],UNIT_A[u]+ORD10[t]];
+}
+const ordCase=(w,k)=>w.split(' ').map(x=>adj(x,k,'mz')).join(' ');
+G.l6r3=R(
+  [1,()=>pairs(some([1,2,3,4,5,6,7,8,9,10,11,12],6).sort((a,b)=>a-b).map(n=>[n+'.',ORD[n]]))],
+  [4,()=>{const n=pick([...Array(19).keys()].map(x=>x+2).concat([21,25,30,32,43,50,58,64,70,86,99]));return write(`${n}. ___`,ord(n))}],
+  [2,()=>{const fr=pick([['Jejich ___ dítě se jmenuje Adam.','n'],['To je moje ___ zaměstnání.','n'],['Je to jeho ___ auto.','n'],['To je naše ___ dcera.','f'],['Můj ___ syn studuje v Praze.','mz'],
+      ['To je moje ___ kniha.','f'],['To je jejich ___ byt.','mn'],['Tohle je moje ___ návštěva v Praze.','f']]),n=pick([2,4,5,6,7,8,9,10]);
+    return choice(`${fr[0]} (${n}.)`,['mz','f','n'].map(g=>adj(ORD[n],'N',g)),adj(ORD[n],'N',fr[1]),'Порядковое числительное согласуется, как прилагательное.')}]
+);
+
+const MON=[['leden','ledna'],['únor','února'],['březen','března'],['duben','dubna'],['květen','května'],['červen','června'],['červenec','července'],['srpen','srpna'],
+  ['září','září'],['říjen','října'],['listopad','listopadu'],['prosinec','prosince']];
+const dayG=d=>ord(d).map(w=>ordCase(w,'G'));
+G.l6r4=R(
+  [3,()=>{const [m,g]=pick(MON),d=1+Math.random()*28|0;return write(`${m} → ${d}. ___`,g,'Дата: месяц в genitivu.')}],
+  [3,()=>{const mi=Math.random()*12|0,[m,g]=MON[mi],d=1+Math.random()*28|0,r=`${dayG(d)[0]} ${g}`,on=ord(d)[0];
+    return choice(`${pick(['Kdy máš narozeniny?','Kdy je ta zkouška?','Kdy jedete na dovolenou?'])} — ${d}. ${mi+1}.`,[r,`${on} ${m}`,`${dayG(d)[0]} ${m}`],r,'Kdy? — порядковое числительное и месяц в genitivu.')}],
+  [2,()=>{const mi=Math.random()*12|0,[m,g]=MON[mi],d=1+Math.random()*31|0;return write(`Kolikátého je dnes? — ${d}. ${mi+1}. → Dnes je ___.`,dayG(d).map(x=>`${x} ${g}`))}]
+);
+
+// ================= LEKCE 7 =================
+const GPL_FR=[['Potřebuju několik ___.',['t','clo']],['Mám hodně ___.',['p']],['Tady je málo ___.',['p']],['Znám málo ___.',['p']],['Nemáme pět ___.',['t']],
+  ['Kupuju několik ___.',['cnt']],['Ve třídě je dvacet ___.',['p']],['Mám deset ___.',['t']]];
+const GPL_PLACE=['divadlo','kino','park','kostel','hotel','nemocnice','škola','obchod','kavárna','knihovna','restaurace'];
+const gplNouns=tags=>tags[0]==='cnt'?['rohlík','jablko','banán','koláč','dort','citron','ryba'].map(x=>NN[x]):NOUNS.filter(n=>tags.some(t=>n.tags.includes(t))&&notName(n)&&!['pán','manžel','manželka','matka','otec','zelenina','maso','cukr','med','voda','mléko','čaj','džus','chléb','sýr','čokoláda','šunka','věc','dítě'].includes(n.nom)&&n.f.G2);
+G.l7r0=R(
+  [5,()=>{const [f,tags]=pick(GPL_FR),n=pick(gplNouns(tags).concat(tags.includes('p')?[NN['člověk'],NN['přítel'],NN['dítě']]:[])),A=adjsFor(n),m=A.length&&Math.random()<.3?{a:pick(A)}:{};
+    return write(`${f} (${nom(n,m)})`,phrase(n,'G2',m),'Много, мало, 5 и больше + G pl.')}],
+  [2,()=>{const c=pick(['Brno','Praha','Ostrava','Plzeň']),n=NN[pick(GPL_PLACE)];return write(`${c} má několik ___. (${n.nom})`,n.f.G2)}],
+  [1,()=>{const x=pick([['koruna','To stojí pět ___.'],['euro','Mám deset ___.'],['koruna','Ten lístek stojí třicet ___.']]);return write(`${x[1]} (${x[0]})`,NN[x[0]].f.G2)}],
+  [2,()=>{const n=pick(gplNouns(['p']));return write(`${pick(['Sedím vedle těch','Jdu od','Bydlím blízko těch'])} ___. (${n.nom} — pl.)`,n.f.G2)}],
+  [1,()=>write(`${pick(['Jsem bez','Nemám dost','Potřebuju hodně'])} ___. (peníze)`,'peněz','peníze → peněz.')]
+);
+
+const Q_PEOPLE=['Ve třídě','Ve škole','V parku','V restauraci','Tam','Na ulici','V kanceláři'];
+const Q_VERB=[['být','je','jsou'],['pracovat','pracuje','pracujou/pracují'],['studovat','studuje','studujou/studují'],['čekat','čeká','čekají'],['tancovat','tancuje','tancujou/tancují']];
+G.l7r1=R(
+  [6,()=>{const pl=Math.random()<.5,place=pick(Q_PEOPLE),[v,sg,plf]=pick(Q_VERB),n=pick(persons().filter(x=>!x.tags.includes('fam')&&!['pán','manžel','manželka','matka','otec','dítě'].includes(x.nom)));
+    const few=Math.random()<.4,num=few?(n.g==='mz'?pick(['dva','tři','čtyři']):pick(['dvě','tři','čtyři'])):pick(['pět','šest','deset','dvacet','hodně','málo','několik','mnoho']);
+    const nf=few?n.f.N2[0]:n.f.G2[0],r=few?plf.split('/')[0]:sg;
+    return choice(`${place} ___ ${num} ${nf}.`,[sg,plf.split('/')[0]],r,few?'2–4 + N pl → глагол во мн. ч.':'5 и больше, hodně, málo, několik + G pl → глагол в 3 л. ед. ч.',true)}],
+  [2,()=>{const thing=pick(SMALL()),few=Math.random()<.5,num=few?NUM24[thing.g]:pick(['pět','šest','deset','několik']);
+    return choice(`${pick(['Na stole','V tašce','Tam'])} ___ ${num} ${few?thing.f.N2[0]:thing.f.G2[0]}.`,['je','jsou'],few?'jsou':'je',undefined,true)}],
+  [1,()=>{const s=pick([['Moje kamarádky','čeká','čekají','na nás'],['Ti studenti','pracuje','pracujou','v knihovně'],['Naše děti','spí','spí',''],['Ty ženy','tancuje','tancujou','']].filter(x=>x[1]!==x[2]));
+    return choice(`${s[0]} ${s[3]?s[3]+' ':''}___.`,[s[1],s[2]],s[2],undefined,true)}],
+  [1,()=>{const n=pick(T('fam').filter(x=>['bratr','sestra','syn','dcera'].includes(x.nom)));return write(`Mám pět ___. (${n.nom})`,n.f.G2)}]
+);
+
+const PG_SHORT=[['Bojí se ___ Alena?',-1],['Zeptáme se ___.',3],['Ptám se ___.',0],['Nebojíme se ___.',3],['Petr se ___ bojí.',2]];
+const PG_LONG=[['Bydlíte blízko ___?',4],['Sejdeme se u ___.',3],['Bez ___ tam nejdu.',0],['Mají z ___ strach.',5],['Sedíme vedle ___.',3],['Máte z ___ radost?',4],['Je to dárek od ___.',-1]];
+G.l7r2=R(
+  [3,()=>{const [f,s]=pick(PG_SHORT),p=prFor(s);return write(`${f} (${p})`,alts(PRON[p].G),'Без предлога — краткая форма.')}],
+  [4,()=>{const [f,s]=pick(PG_LONG),p=prFor(s,['já']);return write(`${f} (${p})`,alts(PRON[p].Gp),'После предлога — длинная форма, j → ň.')}],
+  [1,()=>write(pick(['Tady máš ode ___ dárek. (já)','Je to dopis ode ___. (já)']),'mě','od + mě → ode mě.')],
+  [1,()=>write('Beze ___ nikam nechoď! (já)','mě','bez + mě → beze mě.')]
+);
+
+const BUD=['budu','budeš','bude','budeme','budete','budou'];
+const B_INF=['psát','číst','pracovat','dívat se','cestovat','studovat','vařit','dělat','hrát','učit se','spát','telefonovat','poslouchat'];
+G.l7r3=R(
+  [2,()=>{const s=pick(PS);return write(`Zítra ___ doma. (být – ${s.t})`,BUD[s.i])}],
+  [2,()=>{const s=pick(PS.filter(x=>x.i!==2)),v=pick(['dělat','vařit','číst','studovat']);return write(`Co ___ ${v} v sobotu? (${s.t})`,BUD[s.i])}],
+  [4,()=>{const v=pick(B_INF),vb=V(v),i=Math.random()*6|0,f=forms(v,i)[0],ng=Math.random()<.25,amb=vb.pres.filter(x=>x[0]===f).length>1;
+    const shown=vb.refl?`${f} ${vb.refl}`:f,ans=`${ng?'ne':''}${BUD[i]}${vb.refl?' '+vb.refl:''} ${vb.base}`;
+    return write(`${shown} → ___${amb?` (${PRONS[i]})`:''}${ng?' (negace)':''}`,ans,'Будущее несовершенного вида: budu + инфинитив.')}],
+  [1,()=>{const x=pick([['Dnes je test.','Zítra ___ test.','bude'],['Dnes je hezky.','Zítra ___ taky hezky.','bude'],['Dnes jsou doma.','Zítra ___ taky doma.','budou'],['Dnes jsem tady.','Zítra ___ taky tady.','budu']]);
+    return write(`${x[0]} → ${x[1]}`,x[2])}],
+  [1,()=>{const [ipf,pf]=pick(ASP.filter(a=>!a[0].includes(' ')&&a[0]!=='vstávat')),i=Math.random()*6|0,w=`${BUD[i]} ${pf}`;
+    return choice('Какая форма неправильная?',[`${BUD[i]} ${ipf}`,w,pfF(pf,i)[0],`${BUD[i]} muset ${ipf}`],w,'budu + только несовершенный вид. Совершенный — просто настоящая форма.')}]
+);
+
+const WALK=['do školy','na angličtinu','do kina','na poštu','do parku','na procházku','do obchodu','na trénink'],RIDE=['do Brna','do Prahy','na hory','k moři','na chatu','do Německa'];
+G.l7r4=R(
+  [6,()=>{const hab=Math.random()<.5,walk=Math.random()<.55,s=pick(PS),d=pick(walk?WALK:RIDE),[a,b]=walk?['jít','chodit']:['jet','jezdit'];
+    const lead=hab?pick(walk?['Každé úterý','Často','Každý den','Obvykle','Dvakrát týdně']:['Často','Obvykle','V sobotu vždycky','Každý víkend']):pick(walk?['Dnes','Teď','Právě']:['Dnes','Teď','Tento týden','Zítra']);
+    const fa=forms(a,s.i)[0],fb=forms(b,s.i)[0];
+    return choice(`${lead} ___ ${d}.${s.i?` (${s.t})`:''}`,[fa,fb],hab?fb:fa,hab?`Регулярно — ${b}.`:`Один раз, сейчас — ${a}.`,true)}],
+  [1,()=>{const s=pick(PS.filter(x=>x.i===0||x.i===3));return choice(`Dnes ___ do školy, ${s.i?'necítíme':'necítím'} se dobře.`,[neg(forms('jít',s.i)[0]),neg(forms('chodit',s.i)[0])],neg(forms('jít',s.i)[0]),'Сегодня, один раз — jít.',true)}],
+  [1,()=>{const n=pick(NF);return choice(`Ahoj ${NN[n]?NN[n].f.V[0]:n}, kam ___ teď?`,['jdeš','chodíš'],'jdeš',undefined,true)}],
+  [2,()=>{const v=pick(['chodit','jezdit']),s=pick(PS);return write(`${s.t} ___ (${v})`,forms(v,s.i))}]
+);
+
+const NIC=[
+  ()=>{const v=pick([['čeká','nečeká'],['pracuje','nepracuje'],['bydlí','nebydlí'],['kouří','nekouří'],['je','není']]);return write(`Někdo ${v[0]==='je'?'je doma':'tady '+v[0]}. → ___ ${v[0]==='je'?'není doma':'tady '+v[1]}.`,'Nikdo')},
+  ()=>{const v=pick([['hraje na klavír','nehraje na klavír'],['vaří','nevaří'],['sportuje','nesportuje'],['čte noviny','nečte noviny']]);return write(`Někdy ${v[0]}. → ___ ${v[1]}.`,'Nikdy')},
+  ()=>{const x=pick([['Kupujeme','ovoce','n'],['Mám','otázku','f'],['Hledám','byt','mn'],['Máme','zprávy','pl'],['Čtu','knihu','f'],['Znám','učitele','mz']]),
+    nj={n:'nějaké',f:'nějakou',mn:'nějaký',pl:'nějaké',mz:'nějakého'}[x[2]],z={n:'žádné',f:'žádnou',mn:'žádný',pl:'žádné',mz:'žádného'}[x[2]];
+    return write(`${x[0]} ${nj} ${x[1]}. → Ne${x[0].toLowerCase()} ___ ${x[1]}.`,z,'nějaký → žádný, склоняется как nový.')},
+  ()=>{const x=pick([['Na něco se těšíme.','Na ___ se netěšíme.'],['Něco čtu.','___ nečtu.'],['Dělám něco.','Nedělám ___.'],['Vidím něco.','Nevidím ___.']]);return write(`${x[0]} → ${x[1]}`,'nic')},
+  ()=>{const x=pick([['Ty sešity tady někde jsou.','Ty sešity tady ___ nejsou.'],['Klíč je tady někde.','Klíč tady ___ není.']]);return write(`${x[0]} → ${x[1]}`,'nikde')},
+  ()=>write('Jdu dnes někam. → Dnes ___ nejdu.','nikam'),
+  ()=>{const x=pick([['Někoho čekám.','___ nečekám.'],['Vidím někoho.','Nevidím ___.']]);return write(`${x[0]} → ${x[1]}`,'nikoho')}];
+const NIC_C=[['Promiň, ale dnes ___ nejdu.','někam','nikam','nikam'],['Jdeš dnes ___?','někam','nikam','někam'],['Dáš si ___ sladkého?','něco','nic','něco'],['___ nevidím, ty ano?','Někoho','Nikoho','Nikoho'],
+  ['Vidíš tam ___?','někoho','nikoho','někoho'],['Mám pro tebe ___ zprávy.','nějaké','žádné','nějaké'],['Nemám ___ českou kamarádku.','nějakou','žádnou','žádnou'],['___ tady je, slyším ho.','Někdo','Nikdo','Někdo'],
+  ['Znáš tady ___ dobrou restauraci?','nějakou','žádnou','nějakou']];
+G.l7r5=R(
+  [5,()=>pick(NIC)()],
+  [4,()=>{const [q,a,b,r]=pick(NIC_C);return choice(q,[a,b],r,r===b?'При отрицании — ni- и ne- у глагола (двойное отрицание).':undefined,true)}]
+);
+
+const NECO=[['Dám si něco ___.',['sladký','slaný','studený','teplý','dobrý']],['Chci něco ___.',['sladký','nový','zajímavý','dobrý']],['Nemáte něco ___?',['levný','nový','menší','větší','moderní']],
+  ['To je něco ___!',['nový','zajímavý','krásný']],['Nic ___ už nechci.',['sladký','slaný']],['Co je u vás ___?',['nový','zajímavý']],['To není nic ___.',['příjemný','zajímavý','nový','těžký']],
+  ['Chtěla bych něco ___.',['studený','teplý','sladký']],['Nemám nic ___.',['nový','teplý','sladký']]];
+G.l7r6=()=>{const [f,list]=pick(NECO),a=pick(list);return write(`${f} (${a})`,adj(a,'G','n'),'něco, nic, co + прилагательное в G (-ého, -ího).')};
+
+// ================= LEKCE 8 =================
+const V_PL=['škola','banka','kino','divadlo','obchod','restaurace','kavárna','knihovna','supermarket','nemocnice','kancelář','práce','park','bazén','hotel','kostel','třída'];
+const N_PL=['pošta','letiště','univerzita','náměstí','nádraží','koncert','výlet','zastávka','zahrada','hora','chata','návštěva'];
+const NA_LAND=['Slovensko'];
+const MON_L=['lednu','únoru','březnu','dubnu','květnu','červnu','červenci','srpnu','září','říjnu','listopadu','prosinci'];
+const prepL=(n,f)=>N_PL.includes(n.nom)||NA_LAND.includes(n.nom)?'na':vVe(f);
+const LOC_E={mz:'Мужской одушевлённый: -ovi (мягкие -i).',mn:'Мужской неодушевлённый: -u или -ě.',f:'Женский: -ě/-e (k → c, h → z, r → ř), мягкие -i.',n:'Средний: -ě/-e или -u, на -í без изменений.'};
+const LOC=[
+  ()=>{const n=pick(T('city','land')),f=n.f.L[0];return write(`${pick(['Bydlíme','Bydlím','Studuju','Pracuje'])} ${prepL(n,f)} ___. (${n.nom})`,n.f.L,LOC_E[n.g])},
+  ()=>{const n=NN[pick(V_PL.concat(N_PL))],m=mods(n,{adjP:.25}),f=phrase(n,'L',m)[0];return write(`${pick(['Jsem','Jsme','Čekám','Sedíme','Jana je'])} ${prepL(n,f)} ___. (${nom(n,m)})`,phrase(n,'L',m),LOC_E[n.g])},
+  ()=>{const n=pick(tagged('p').filter(x=>x.nom!=='dítě')),m=notName(n)?mods(n,{adjP:.3}):{};return write(`${pick(['Mluvíme o','Mluvím o','Čtu o','Povídáme si o'])} ___. (${nom(n,m)})`,phrase(n,'L',m),LOC_E[n.g])},
+  ()=>{const n=pick(T('top','city','land').concat(['film','kniha','test','zkouška'].map(x=>NN[x]))),m=n.tags.includes('city')?{}:mods(n,{adjP:.3});return write(`${pick(['Čtu o ___.','Mluvíme o ___.','Víš něco o ___?'])} (${nom(n,m)})`,phrase(n,'L',m))},
+  ()=>{const i=Math.random()*12|0;return write(`Mám narozeniny v ___. (${MON[i][0]})`,MON_L[i],'Месяцы: v + L — v lednu, v září, v prosinci.')},
+  ()=>{const n=NN[pick(['stůl','židle','postel','skříň','gauč','křeslo','okno'])];return write(`${pick(['Kniha je','Taška leží','Kočka sedí','Telefon je'])} na ___. (${n.nom})`,n.f.L)},
+  ()=>{const n=NN[pick(['dům','byt','pokoj','hotel'])],m={d:1,a:pick(['nový','starý','velký'])};return write(`Bydlím v ___. (${nom(n,m)})`,phrase(n,'L',m))}];
+G.l8r0=R(
+  [8,()=>pick(LOC)()],
+  [3,()=>{const na=Math.random()<.5,n=NN[pick(na?N_PL:V_PL)],f=n.f.L[0],v=vVe(f);return choice(`${pick(['Jsem','Čekám','Byli jsme','Jsme'])} ___ ${f}.`,['na',v],na?'na':v,na?'na + L: те же места, что «na + A».':'v + L: внутри здания.',true)}],
+  [1,()=>{const x=pick([['večeři','večeře'],['obědě','oběd'],['škole','škola'],['práci','práce'],['koncertě','koncert']]);return choice(`___ ${x[0]} ${pick(['budu dělat úkoly','jdu domů','odpočívám'])}. (после)`,['Po','Na','O'],'Po','po + L — после.',true)}]
+);
+
+const PL_L={mz:'něm',mn:'něm',n:'něm',f:'ní'};
+const PL8=[['Co si o ___ myslíš?',1],['Budeme o ___ mluvit.',3],['Můžeme o ___ mluvit?',3],['Píše o ___.',-1],['Mluvíme o ___.',3],['Často o ___ mluví.',-1],['Víte o ___ něco?',4]];
+const CTX8=[['Čtete o','čtu o',['film','kniha','město','Praha','test']],['Mluvíte o','mluvíme o',['učitel','sestra','kniha','film','kamarádka']],['Přemýšlíš o','přemýšlím o',['test','zkouška','práce','film']],
+  ['Bydlíš v','bydlím v',['dům','byt']],['Studuješ na','studuju na',['univerzita']],['Pracuješ v','pracuju v',['banka','nemocnice','kancelář','hotel']]];
+G.l8r1=R(
+  [4,()=>{const [f,s]=pick(PL8),p=prFor(s);return write(`${f} (${p})`,PRON[p].L)}],
+  [4,()=>{const [q,a,list]=pick(CTX8),n=NN[pick(list)],ph=n.tags.includes('city')?n.f.L[0]:`${ten('L',n.g)} ${n.f.L[0]}`,qq=q.endsWith(' v')?q.slice(0,-1)+vVe(ph):q;
+    return write(`${qq} ${ph}? — Ano, ${a} ___.`,PL_L[n.g],n.g==='f'?'Женский род → ní.':'Мужской и средний род → něm.')}]
+);
+
+// past tense
+const P3=[{t:'Petr',g:'m'},{t:'Tatínek',g:'m'},{t:'Dědeček',g:'m'},{t:'Pan Novák',g:'m'},{t:'Jana',g:'f'},{t:'Kristýna',g:'f'},{t:'Maminka',g:'f'},{t:'Babička',g:'f'},{t:'Alena',g:'f'},
+  {t:'Dítě',g:'n'},{t:'Nina a Tomáš',g:'pl'},{t:'Roman a Helena',g:'pl'},{t:'Kluci',g:'pl'},{t:'Studenti',g:'pl'}];
+const PAST_T={dělat:['úkol','večeři'],být:['doma','v práci','u babičky'],jít:['do kina','domů','na procházku','na gymnastiku'],číst:['zajímavou knihu','noviny'],jíst:['jen maso','rohlík'],
+  jet:['na letiště','do Brna','k moři'],chtít:['studovat v Anglii','jít do kina'],spát:['celý den','dlouho'],vidět:['ten film','tvoje auto'],mít:['hlad','hodně práce'],psát:['dopis','e-mail'],
+  pít:['kávu','čaj'],studovat:['gramatiku','češtinu'],pracovat:['celý den','v bance'],hrát:['fotbal','na klavír'],vařit:['polévku','oběd'],zapomenout:['klíče','deštník'],
+  přijít:['pozdě','domů'],vzít:['deštník','taxi'],koupit:['chleba','nové kolo'],moct:['přijít'],říct:['pravdu'],začít:['studovat']};
+const PAST_X={zapomenout:'zapomněl',přijít:'přišel',vzít:'vzal',koupit:'koupil',moct:'mohl',říct:'řekl',začít:'začal',chtít:'chtěl'};
+const partM=v=>PAST_X[v]||V(v).past;
+const AUX=['jsem','jsi','','jsme','jste',''];
+const PG={m:'m',f:'f',n:'n',pl:'pl'};
+// the past form for a subject: s.i person, s.g gender
+const pastOf=(v,s)=>pastF(partM(v),s.i>=3?'pl':s.g);
+G.l8r2=R(
+  [4,()=>{const v=pick(Object.keys(PAST_T)),s=pick(P3),q=Math.random()<.2&&v==='dělat';
+    if(q)return write(`Co ___ ${/^(Ta|Ba|Dě|Ma|Dí|Kl|St)/.test(s.t)?low(s.t):s.t.replace(/^Pan /,'pan ')} včera večer? (dělat)`,pastF(partM('dělat'),s.g));
+    if(v==='být'&&Math.random()<.5){const a={m:'unavený',f:'unavená',n:'unavené',pl:'unavení'}[s.g];return write(`${s.t} ___ ${a}. (být)`,pastF('byl',s.g))}
+    return write(`${s.t} ___ ${pick(PAST_T[v])}. (${v})`,pastF(partM(v),s.g),'В 3-м лице — без jsem / jsi.')}],
+  [4,()=>{const v=pick(Object.keys(PAST_T)),s=pick(PS.filter(x=>x.i!==2&&x.i!==5)),p=pastOf(v,s),tail=pick(PAST_T[v]),lead=Math.random()<.6?pick(['Včera','Večer','Ráno','V sobotu']):'';
+    return write(`${lead?lead+' ':''}___ ${tail}. (${v} – ${who(s,1)})`,gapV(lead,p,AUX[s.i]),lead?'jsem, jsi… — на второй позиции, сразу после первого слова.':'Глагол первым, jsem / jsi сразу за ним.')}],
+  [2,()=>{const v=pick(['vidět','dělat','koupit','číst','psát']),s=pick(PS.filter(x=>x.i===1||x.i===4)),p=pastOf(v,s),tail=pick(PAST_T[v]);
+    return write(`___ ${AUX[s.i]} ${tail}? (${v} – ${who(s,1)})`,cap(p))}],
+  [2,()=>{const v=pick(['jít','jet','být','přijít']),s=pick(P3.filter(x=>x.g!=='n')),p=pastF(partM(v),s.g),tail=pick(PAST_T[v]);
+    return choice(`${s.t} ___ ${tail}.`,[`je ${p}`,p,`jsem ${p}`],p,'В 3-м лице вспомогательного глагола нет: Helena šla, не «je šla».')}],
+  [2,()=>pick([
+    ()=>{const s=pick(PS.filter(x=>x.i===0)),v=pick(['studovat','dělat','číst','psát','vařit']),o=pick({studovat:['gramatiku','češtinu'],dělat:['úkol'],číst:['knihu'],psát:['dopis'],vařit:['polévku','oběd']}[v]),
+      p=pastF(partM(v),s.g),l=pick(['Včera','Večer','Ráno']);return order(`${l} jsem ${p} ${o}.`,[`${l} jsem ${o} ${p}.`])},
+    ()=>{const g=pick(['m','f']),pr=pick(['ho','ji','je']);return order(`Myslím, že jsem ${pr} ne${pastF('viděl',g)}.`)}])()]
+);
+
+const MSU=[['Tady je zákaz parkování. Tady ___ parkovat.','smět',1,1],['___ tady kouřit? — Ne, tady nesmíte.','smět',3,0],['Děti tady ___ hrát? — Ano, smějí.','smět',5,0],
+  ['V muzeu se ___ fotografovat? — Ne, to se nesmí.','smět',2,0],['Marie ___ hrát na klavír, učí se to už deset let.','umět',2,0],['Filip ___ francouzsky, byl dva roky v Paříži.','umět',2,0],
+  ['___ česky? — Trochu, učím se to.','umět',4,0],['Moje babička ___ dobře vařit.','umět',2,0],['Paní učitelko, ___ studovat i stranu osm?','mít',3,0],['Lékař říká, že ___ víc odpočívat.','mít',0,0],
+  ['___ ti pomoct s tou taškou? — Ano, děkuju.','mít',0,0],['Co ___ dělat? — Napište to cvičení.','mít',3,0]];
+const MSU_F={mít:V('mít').pres.map(x=>x[0]),smět:['smím','smíš','smí','smíme','smíte','smějí'],umět:['umím','umíš','umí','umíme','umíte','umějí']};
+G.l8r3=R(
+  [5,()=>{const [q,v,i,ng]=pick(MSU),start=q.startsWith('___'),f=x=>{const w=(ng?'ne':'')+MSU_F[x][i];return start?cap(w):w};
+    return choice(q,['mít','smět','umět'].map(f),f(v),'umět — уметь (навык), smět — разрешено, mít — должен (совет, поручение).')}],
+  [3,()=>{const v=pick(['umět','smět','mít']),s=pick(PS);return write(`${s.t} ___ (${v})`,v==='smět'?(s.i===5?['smějí','smí']:[MSU_F.smět[s.i]]):forms(v,s.i))}]
+);
+
+// ================= LEKCE 9 =================
+const REFL_P={'učit se':['gramatiku','na test','česky'],'dívat se':['na film','na televizi'],'těšit se':['na víkend','na dovolenou'],'starat se':['o bratra','o psa','o babičku'],
+  'ptát se':['učitele','na cestu'],'dát si':['kávu','pivo','něco k jídlu'],'koupit si':['nový svetr','knihu'],'povídat si':['s kamarádkou','celou cestu'],'objednat si':['polévku','oběd'],
+  'ztratit se':['v Praze','v lese'],'zeptat se':['učitele'],'sednout si':['na židli','vedle mě'],'vzít si':['deštník','svetr']};
+const REFL_X={'koupit si':'koupil','objednat si':'objednal','ztratit se':'ztratil','zeptat se':'zeptal','sednout si':'sedl','vzít si':'vzal','dát si':'dal'};
+const rPart=(v,g)=>pastF(REFL_X[v]||V(v).past,g);
+// the clitics after the first word: jsem se, ses (= jsi se), se
+const rCl=(i,r)=>i===1?[r==='se'?'ses':'sis','jsi '+r]:[[AUX[i],r].filter(Boolean).join(' ')];
+G.l9r0=R(
+  [4,()=>{const v=pick(Object.keys(REFL_P)),r=v.split(' ')[1],s=pick(PS),p=rPart(v,s.i>=3?'pl':s.g),lead=pick(['Včera','Večer','Moc','Dlouho','V sobotu']),t=pick(REFL_P[v]);
+    return write(`${lead} ___ ${p} ${t}. (${who(s,0)})`,rCl(s.i,r),'Порядок: jsem / jsi на 2-й позиции, сразу за ним se / si. jsi + se = ses, jsi + si = sis.')}],
+  [2,()=>{const v=pick(Object.keys(REFL_P)),r=v.split(' ')[1],g=pick(['m','f']),p=rPart(v,g);return write(`___ ${r==='se'?'ses':'sis'} ${pick(REFL_P[v])}? (${v} – ty, ${GRU[g]})`,cap(p))}],
+  [2,()=>{const v=pick(Object.keys(REFL_P)),r=v.split(' ')[1],g=pick(['m','f']),p=rPart(v,g);return write(`${cap(p)} ___ ${pick(REFL_P[v])}? (${v} – ty)`,rCl(1,r),'jsi + se = ses, jsi + si = sis.')}],
+  [2,()=>pick([
+    ()=>{const g=pick(['m','f']),v=pick(['učit se','dívat se','starat se']),t=pick(REFL_P[v]),p=rPart(v,g),l=pick(['Včera','Večer']);
+      return order(`${l} jsem se ${p} ${t}.`,t.split(' ').length===1?[`${l} jsem se ${t} ${p}.`]:[])},
+    ()=>{const g=pick(['m','f']);return order(`Ne${rPart('učit se',g)} jsem se novou gramatiku.`)},
+    ()=>{const g=pick(['m','f']),t=pick(['kávu','pivo']);return order(`Dal${g==='f'?'a':''} sis ${t}?`)}])()]
+);
+
+const DAT_FR=[['Telefonuju ___.',['p']],['Pomáhám ___.',['p']],['Děkuju ___.',['p']],['Volám ___.',['p']],['Kupuju ___ dárek.',['fam']],['Píšu ___ dopis.',['p']],['Kolik let je ___?',['fam','name']]];
+const DAT_E={mz:'Мужской одушевлённый: -ovi (мягкие -i / -ovi).',mn:'Мужской неодушевлённый: -u (мягкие -i).',f:'Женский: -ě/-e (k → c, h → z, r → ř), мягкие -i.',n:'Средний: -u, мягкие -i.'};
+const datP=()=>tagged('p').filter(x=>x.nom!=='dítě'&&x.nom!=='pán');
+G.l9r1=R(
+  [5,()=>{const [f,tags]=pick(DAT_FR),n=pick(tagged(...tags).filter(x=>!['dítě','pán','člověk','Čech'].includes(x.nom))),m=notName(n)?mods(n,{adjP:.3}):{};return write(`${f} (${nom(n,m)})`,phrase(n,'D',m),DAT_E[n.g])}],
+  [2,()=>{const n=pick(datP().filter(x=>['doktor','lékař','kamarád','babička','kamarádka','sestra','dědeček','doktorka','bratr','Petr','Jana','Eva','Tomáš','Karel'].includes(x.nom))),f=n.f.D[0];
+    return write(`${pick(['Jdu','Jdeme','Půjdu'])} ${kKe(f)} ___. (${n.nom})`,n.f.D,'k / ke + D: к кому.')}],
+  [1,()=>write(`Jedeme ${pick(['v létě','o prázdninách'])} k ___. (moře)`,'moři')],
+  [1,()=>{const n=NN[pick(['text','úkol','slovo','test'])],m={d:1};return write(`Nerozumím ___. (${nom(n,m)})`,phrase(n,'D',m),'rozumět + D.')}],
+  [1,()=>{const n=NN[pick(['škola','banka','park','nádraží','pošta','kostel','divadlo','kino'])];return write(`Bydlím naproti ___. (${n.nom})`,n.f.D,'naproti + D.')}],
+  [2,()=>{if(Math.random()<.5){const n=pick(datP().filter(x=>['dědeček','babička','kamarád','kamarádka','doktor','sestra','bratr'].includes(x.nom))),f=n.f.D[0],k=kKe(f);
+      return choice(`Jdu ___ ${f}.`,[k,'do'],k,'К человеку — k + D.',true)}
+    const n=NN[pick(['škola','banka','kino','divadlo','restaurace','kavárna','knihovna','nemocnice'])],f=n.f.G[0];return choice(`Jdu ___ ${f}.`,[kKe(f),'do'],'do','Внутрь — do + G.',true)}]
+);
+
+const PD_SHORT=[['Je ___ zima.',-1],['Kolik je ___ let?',-1],['Líbí se ___ Praha.',-1],['Můžeme ___ pomoct?',3],['Telefonuju ___.',0],['Hodí se ___ to zítra?',-1],['Je ___ špatně?',-1],
+  ['Chutná ___ ta polévka?',-1],['Děkuju ___.',0],['Dám ___ to zítra.',0],['Zavolám ___ večer.',0]];
+const PD_LONG=[['Odpoledne k ___ jdeme.',3],['Budou bydlet naproti ___.',5],['Díky ___ to vím.',0]];
+G.l9r2=R(
+  [5,()=>{const [f,s]=pick(PD_SHORT),p=prFor(s);return write(`${f} (${p})`,PRON[p].D,'Без предлога — краткая форма: mi, ti, mu, jí…')}],
+  [2,()=>{const [f,s]=pick(PD_LONG),p=prFor(s,['já']);return write(`${f} (${p})`,PRON[p].Dp,'После предлога — длинная форма: k němu, naproti ní.')}],
+  [1,()=>write(pick(['Pojď ke ___! (já)','Přijď zítra ke ___. (já)']),'mně','k + mně → ke mně.')],
+  [1,()=>write('Co ___ pořád vadí, Lído? (ty)','ti')]
+);
+
+const FUT={jít:'půjdu,půjdeš,půjde,půjdeme,půjdete,půjdou',jet:'pojedu,pojedeš,pojede,pojedeme,pojedete,pojedou',letět:'poletím,poletíš,poletí,poletíme,poletíte,poletí',
+  běžet:'poběžím,poběžíš,poběží,poběžíme,poběžíte,poběží',nést:'ponesu,poneseš,ponese,poneseme,ponesete,ponesou',vézt:'povezu,povezeš,poveze,povezeme,povezete,povezou',
+  vést:'povedu,povedeš,povede,povedeme,povedete,povedou'};
+const FUT_T={jít:['do kina','na procházku','k doktorovi','domů'],jet:['tramvají','do Brna','na hory','autem'],letět:['do Londýna','do Paříže'],běžet:['na autobus','domů'],
+  nést:['tu tašku','dopis na poštu'],vézt:['děti do školy','babičku k doktorovi'],vést:['syna do školy','psa na procházku']};
+const IND={chodit:['do školy pěšky','na angličtinu'],jezdit:['do práce autem','na kole'],nosit:['tašku','brýle'],běhat:['v parku','každé ráno']};
+const PAIRS9=[['běžet','běhat','běžím,běžíš,běží,běžíme,běžíte,běží','běhám,běháš,běhá,běháme,běháte,běhají','v parku'],['nést','nosit','nesu,neseš,nese,neseme,nesete,nesou','nosím,nosíš,nosí,nosíme,nosíte,nosí','ty dopisy'],
+  ['vést','vodit','vedu,vedeš,vede,vedeme,vedete,vedou','vodím,vodíš,vodí,vodíme,vodíte,vodí','syna do školy'],['vézt','vozit','vezu,vezeš,veze,vezeme,vezete,vezou','vozím,vozíš,vozí,vozíme,vozíte,vozí','děti do školy'],
+  ['letět','létat','letím,letíš,letí,letíme,letíte,letí','létám,létáš,létá,létáme,létáte,létají','do Londýna']];
+const PRI_OD=[['O víkendu k nám ___ babička.','přijela','odjela'],['Petr už ___ domů, není tady.','odešel','přišel'],['Ahoj mami, už jsem v Praze, ___ jsem před hodinou.','přijela','odjela'],
+  ['Za 20 minut ___, musíme do letadla.','odlétáme','přilétáme'],['Hosté ___ v sedm, musím uvařit večeři.','přijdou','odejdou'],['Je pozdě, musím už ___.','odejít','přijít'],
+  ['Babička ___ zítra ráno, dnes je u nás naposledy.','odjede','přijede'],['Pojď sem! Kdy už ___?','přijdeš','odejdeš']];
+G.l9r3=R(
+  [4,()=>{const v=pick(Object.keys(FUT)),s=pick(PS),t=pick(FUT_T[v]);return write(`${pick(v==='běžet'?['Hned','Za chvíli']:['Zítra','V neděli','Večer','V sobotu'])} ___ ${t}. (${v} – ${s.t})`,alts(FUT[v].split(',')[s.i]),'Однонаправленные: будущее с po- (jít → půjdu).')}],
+  [2,()=>{const v=pick(Object.keys(IND)),s=pick(PS);return write(`${pick(['Celý týden','Příští rok','Od září'])} ___ ${pick(IND[v])}. (${v} – ${s.t})`,`${BUD[s.i]} ${v}`,'Многонаправленные: budu + инфинитив.')}],
+  [3,()=>{const [q,r,w]=pick(PRI_OD);return choice(q,[r,w],r,'při- — прийти, приехать (сюда); od- — уйти, уехать (отсюда).')}],
+  [3,()=>{const [a,b,fa,fb,t]=pick(PAIRS9),hab=Math.random()<.5,s=pick(PS),A=fa.split(',')[s.i],B=fb.split(',')[s.i];
+    const lead=hab?pick(['Každé ráno','Často','Každý den','Obvykle']):pick(['Teď','Právě']);
+    return choice(`${lead} ___ ${t}.${s.i?` (${s.t})`:''}`,[A,B],hab?B:A,hab?`Регулярно — ${b}.`:`Сейчас, в одну сторону — ${a}.`,true)}]
+);
+
+const ADV=[['dobrý','dobře'],['špatný','špatně'],['rychlý','rychle'],['pomalý','pomalu'],['hezký','hezky'],['krásný','krásně'],['tichý','tiše'],['zajímavý','zajímavě'],['dlouhý','dlouho'],['teplý','teplo']];
+const ADV_FR=[['{S} mluví česky velmi ___.',['dobrý','špatný','rychlý','pomalý','hezký']],['{S} vaří moc ___.',['dobrý','špatný']],['{S} jezdí moc ___.',['rychlý','pomalý']],
+  ['{S} mluví ___.',['tichý','rychlý','pomalý']],['Je mi ___.',['teplý']],['Dnes je venku ___.',['hezký','krásný','teplý']],['{S} píše velmi ___.',['hezký','zajímavý']],['Čekám tady už ___.',['dlouhý']]];
+const ADJ_FR=[['nápad',['dobrý','zajímavý','špatný']],['auto',['rychlý','pomalý']],['kniha',['zajímavý','dlouhý','dobrý']],['film',['dlouhý','zajímavý','dobrý','špatný']],
+  ['čaj',['teplý']],['polévka',['teplý','dobrý']],['vlak',['rychlý','pomalý']],['den',['krásný','hezký','dlouhý']]];
+const PLACE9=[['venku','ven'],['doma','domů'],['tady','sem']];
+G.l9r4=R(
+  [3,()=>{const [f,list]=pick(ADV_FR),a=pick(list),[adjW,adv]=ADV.find(x=>x[0]===a),s=pick(NM.concat(NF));
+    return choice(f.replace('{S}',s),[adj(adjW,'N',NF.includes(s)?'f':'mz'),adv],adv,'При глаголе — наречие (jak?).',true)}],
+  [3,()=>{const [n,list]=pick(ADJ_FR),a=pick(list),N=NN[n],adv=ADV.find(x=>x[0]===a)[1];return choice(`To je ___ ${n}.`,[adj(a,'N',N.g),adv],adj(a,'N',N.g),'При существительном — прилагательное (jaký?).',true)}],
+  [3,()=>{const [st,mo]=pick(PLACE9),kam=Math.random()<.5;
+    const q=kam?pick({venku:['Jdu ___.','Pojď ___!','Děti běží ___.'],doma:['Jdu ___.','Už musím ___.','Jedeme ___.'],tady:['Pojď ___!','Dej to ___.']}[st]):pick({venku:['Byla jsem celý den ___.','Děti si hrají ___.','Je ___ zima?'],doma:['Jsem ___.','Celý den jsem byl ___.','Pracuju ___.'],tady:['Čekám ___.','Bydlím ___.']}[st]);
+    return choice(q,[st,mo],kam?mo:st,kam?'Куда? — наречие направления.':'Где? — наречие места.',true)}],
+  [1,()=>{const n=pick(ADJ_FR),N=NN[n[0]],a=pick(n[1]),j=JAKY[N.g];return choice(`___ je ${ten('N',N.g)} ${n[0]}? — Je ${adj(a,'N',N.g)}.`,['Jak',j],j,'О качестве предмета — jaký?',true)}],
+  [1,()=>choice(`___ se ${pick(['máš','máte'])}? — Dobře.`,['Jak','Jaký'],'Jak',undefined,true)]
+);
+
+// ================= LEKCE 10 =================
+const MEANS=['auto','tramvaj','vlak','autobus','metro','letadlo'];
+const INS_E={mz:'Мужской: -em.',mn:'Мужской: -em.',f:'Женский: -ou, мягкие и на согласную -í.',n:'Средний: -em, на -í → -ím.'};
+const insP=()=>tagged('p','a').filter(x=>x.nom!=='pán');
+const INS=[
+  ()=>{const n=NN[pick(MEANS)];return write(`${pick(['Do práce jezdím','Do Prahy pojedeme','Do školy jedu','Rádi jezdí','Domů pojedu'])} ___. (${n.nom})`,n.f.I,'Транспорт — instrumentál без предлога.')},
+  ()=>{const n=NN[pick(['tužka','propiska','pero'])];return write(`${pick(['Píšu','Píšeme','Pište'])} ___. (${n.nom})`,n.f.I,'Инструмент — instrumentál без предлога.')},
+  ()=>{const n=pick(insP()),m=notName(n)?mods(n,{adjP:.2}):{},f=phrase(n,'I',m);return write(`${pick(['Mluvím','Jdu do kina','Bydlím','Setkal jsem se','Chodím na procházku','Rád hraju tenis'])} ${sSe(f[0])} ___. (${nom(n,m)})`,f,INS_E[n.g])},
+  ()=>{const x=pick([['Piju kávu','mléko','cukr'],['Čaj','med','citron','mléko','cukr'],['Chleba','sýr','šunka','máslo'],['Rohlík','sýr','šunka','máslo']]),n=NN[pick(x.slice(1))];
+    return write(`${x[0]} ${sSe(n.f.I[0])} ___. (${n.nom})`,n.f.I)},
+  ()=>{const p=pick([['čeká před','dům','škola','kino','banka','nádraží'],['leží pod','postel','stůl','židle'],['visí nad','postel','gauč','stůl'],['stojí za','dům','škola','kostel']]),n=NN[pick(p.slice(1))];
+    const s={čeká:'Bratr',leží:'Taška',visí:'Obraz',stojí:'Auto'}[p[0].split(' ')[0]];return write(`${s} ${p[0]} ___. (${n.nom})`,n.f.I,'Где? — nad, pod, před, za, mezi + I.')},
+  ()=>{const x=pick(['divadlo','kino','škola','park']),n=NN[x];return write(`Banka je mezi poštou a ___. (${x})`,n.f.I)},
+  ()=>{const n=NN[pick(['lékař','učitel','doktor','zpěvák','herec','programátor','učitelka','doktorka'])],s=n.g==='f'?pick(['Chci být','Moje sestra chce být','Chtěla bych být']):pick(['Chci být','Můj bratr chce být','Chtěl bych být']);
+    return write(`${s} ___. (${n.nom})`,n.f.I,'Профессия после být — instrumentál.')},
+  ()=>{const n=NN[pick(['práce','hotel','kniha','učebnice','auto','pokoj','byt'])],m=Math.random()<.5?{a:pick(['nový','starý'])}:{d:1},f=phrase(n,'I',m);
+    return write(`${pick(['Jsem spokojený','Jsem spokojená','Nejsme spokojení'])} ${sSe(f[0])} ___. (${nom(n,m)})`,f)}];
+G.l10r0=R(
+  [8,()=>pick(INS)()],
+  [3,()=>{const x=pick([['Obraz je nad','Dali obraz nad',['stůl','postel','gauč']],['Kočka spí pod','Kočka si lehla pod',['stůl','postel','židle']],['Auto parkuje za','Postav auto za',['dům','škola']],
+      ['Lampa visí nad','Pověsíme lampu nad',['stůl','gauč']],['Taška leží pod','Dej tašku pod',['stůl','židle','postel']]]),n=NN[pick(x[2])],kde=Math.random()<.5;
+    return choice(`${kde?x[0]:x[1]} ___.`,[n.f.I[0],n.f.A[0]],kde?n.f.I[0]:n.f.A[0],kde?'Где? — instrumentál.':'Куда? — akuzativ.',true)}]
+);
+
+const PI_FR=[['Půjdu {s} ___ na hokej.',0],['Jindřich {s} ___ chodí dva roky.',2,['ona','ty','já']],['Už dlouho jsem {s} ___ nemluvil.',0],['Proč {s} ___ nechceš jet?',1],['Chodíme {s} ___ hrát volejbal.',3],
+  ['Bydlím {s} ___.',0],['Těším se na výlet {s} ___.',0],['Kdo sedí před ___?',-1],['Kdo stojí za ___?',-1],['Chce se {s} ___ chodit.',-1]];
+G.l10r1=R(
+  [6,()=>{const [f,s,only]=pick(PI_FR),p=f.startsWith('Chce se')?'já':only?pick(only):prFor(s);return write(`${f.replace('{s}',p==='já'?'se':'s')} (${p})`,PRON[p].I,p==='já'?'s + mnou → se mnou.':'После предлога — с ň: s ním, s ní, s nimi.')}],
+  [1,()=>write('Můžu s ___ mluvit, pane Novotný? (vy)','vámi')]
+);
+
+const PREF=[['Tady musíte ___ na druhou stranu ulice.',['dojít','přejít','odejít'],'přejít'],['K tomu hradu můžeme ___ autem.',['dojet','přejet','odjet'],'dojet'],
+  ['Ahoj mami, před minutou jsem ___ do Prahy.',['doletěla','přeletěla'],'doletěla'],['Letadlo ___ přes moře.',['doletělo','přeletělo'],'přeletělo'],['Kdy už tam ___?',['dojdeme','přejdeme'],'dojdeme'],
+  ['Musíme ___ přes most.',['dojít','přejít'],'přejít'],['Za deset minut ___ na nádraží.',['dojdeme','přejdeme'],'dojdeme'],['Babička ___ nákup až domů.',['donesla','přenesla'],'donesla'],
+  ['Ten řidič ___ hranici v noci.',['dojel','přejel'],'přejel'],['Petr ___ do školy včas.',['došel','přešel'],'došel'],['Pojďte, ___ ulici tady.',['dojdeme','přejdeme'],'přejdeme'],
+  ['Autobus nás ___ až k hotelu.',['doveze','převeze'],'doveze']];
+G.l10r2=()=>{const [q,o,r]=pick(PREF);return choice(q,o,r,r.startsWith('pře')?'pře- — через, на другую сторону.':'do- — дойти, доехать до цели.')};
+
+const BYLO_P=[['Ve třídě','studovat'],['Na diskotéce','tancovat'],['Tam','být'],['V parku','být'],['V restauraci','sedět'],['Na zastávce','čekat'],['V kanceláři','pracovat']];
+const BYLO_T=[['Na stole','ležet'],['V tašce','být'],['Na ulici','parkovat'],['Tam','být']];
+G.l10r3=R(
+  [5,()=>{const [pl,v]=pick(BYLO_P),n=pick(persons().filter(x=>x.g==='mz'&&!['pán','manžel','otec','syn','dědeček','tatínek','bratr'].includes(x.nom))),few=Math.random()<.35,one=!few&&Math.random()<.25;
+    const p=partM(v);
+    if(one){const nm=pick(NM);return choice(`${pl} ___ ${nm}.`,[pastF(p,'n'),pastF(p,'pl'),p],p,'Один человек — по роду: byl, byla.',true)}
+    const num=few?pick(['dva','tři','čtyři']):pick(['pět','dvacet','hodně','málo','několik','deset']),nf=few?n.f.N2[0]:n.f.G2[0];
+    return choice(`${pl} ___ ${num} ${nf}.`,[pastF(p,'n'),pastF(p,'pl'),p],few?pastF(p,'pl'):pastF(p,'n'),few?'2–4 + N pl → -li.':'5 и больше, hodně, málo + G pl → средний род: -lo.',true)}],
+  [2,()=>{const [pl,v]=pick(BYLO_T),n=v==='parkovat'?NN['auto']:pick(SMALL()),p=partM(v);
+    return choice(`${pl} ___ ${pick(['pět','hodně','málo','několik','šest'])} ${n.f.G2[0]}.`,[pastF(p,'n'),pastF(p,'pl'),p],pastF(p,'n'),'5 и больше + G pl → -lo.',true)}]
+);
+
+const KDYZ=[['prší','jsem doma'],['mám čas','čtu knihy'],['jsem nemocný','ležím v posteli'],['jsem nemocná','ležím v posteli'],['je hezky','jezdíme na kole'],['mám hlad','dám si rohlík'],
+  ['jsem unavená','jdu brzo spát'],['je zima','piju teplý čaj'],['mám dovolenou','jezdím k moři'],['jsem byl malý','chtěl jsem psa'],['jsem byla malá','bydlela jsem v Brně'],
+  ['přijdu domů','dívám se na televizi'],['jsem sám doma','poslouchám hudbu'],['jsme byli v Praze','navštívili jsme tetu']];
+G.l10r4=R(
+  [2,()=>{const [a,b]=pick(KDYZ);return order(`Když ${a}, ${b}.`)}],
+  [1,()=>order('Co děláš, když máš dovolenou?')],
+  [3,()=>{const [a,b]=pick(KDYZ);return choice(`___ ${a}, ${b}.`,['Když','Že','Proto'],'Když',undefined,true)}],
+  [2,()=>{const [a,b]=pick(KDYZ);return choice(`${cap(b)}, ___ ${a}.`,['když','že','proto'],'když',undefined,true)}]
+);
+
+// ================= LEKCE 11 =================
+const NAT=[['Slovák','Slováci'],['Polák','Poláci'],['Němec','Němci'],['Rus','Rusové'],['Američan','Američané'],['Angličan','Angličané'],['Ital','Italové'],['Francouz','Francouzi']];
+const mzPl=()=>persons().filter(x=>x.g==='mz');
+G.l11r0=R(
+  [5,()=>{if(Math.random()<.2){const [n,p]=pick(NAT);return write(`${n} → To jsou ___.`,p)}const n=pick(mzPl());return write(`${n.nom} → To jsou ___.`,n.f.N2,n.nom==='učitel'||n.nom==='přítel'?'-tel → -telé.':undefined)}],
+  [3,()=>{const n=pick(mzPl()),r=Math.random(),m=r<.35?{o:pick(['můj','tvůj','náš','váš'])}:r<.65?{d:1}:{a:pick(adjsFor(n).filter(a=>a.endsWith('ý')).concat(['nový','dobrý','český']))};
+    return write(`${nom(n,m)} → To jsou ___.`,phrase(n,'N2',m),m.a?'Прилагательные: -í с чередованием (dobrý → dobří, český → čeští).':m.d?'ten → ti.':'můj → moji / mí, náš → naši.')}]
+);
+
+const SVUJ_N=[['pokoj','{V} do ___ pokoje.','G','jít'],['otec','{V} o ___ otci.','L','mluvit'],['matka','{V} o ___ matce.','L','mluvit'],['kamarád','{V} na ___ kamaráda.','A','čekat'],
+  ['sestra','{V} na ___ sestru.','A','čekat'],['bratr','{V} ___ bratrovi.','D','telefonovat'],['klíč','{V} ___ klíč.','A','hledat'],['taška','{V} ___ tašku.','A','hledat'],
+  ['kamarádka','{V} ___ kamarádce.','D','telefonovat'],['práce','{V} o ___ práci.','L','mluvit'],['auto','{V} ___ auto.','A','hledat'],['škola','{V} do ___ školy.','G','jít']];
+const SV_S=[{t:'',i:0,h:'я'},{t:'',i:1,h:'ты'},{t:'Petr',i:2,h:'Petr',g:'m'},{t:'Jana',i:2,h:'Jana',g:'f'},{t:'Máma',i:2,h:'мама',g:'f'},{t:'',i:3,h:'мы'},{t:'Oni',i:5,h:'они'}];
+const OWN_RU={já:'я',ty:'ты',my:'мы',vy:'вы',oni:'они'};
+// the possessive the learner might wrongly use instead of svůj: můj for «já», jeho for Petr…
+const selfOwn=s=>s.i===2?(s.g==='f'?'její':'jeho'):OWN[PRONS[s.i]];
+G.l11r1=R(
+  [6,()=>{const [nn,fr,k,v]=pick(SVUJ_N),N=NN[nn],s=pick(SV_S),self=Math.random()<.5;
+    let own,hint;
+    if(self){own=selfOwn(s);hint=`владелец — ${s.h}, подлежащее`}
+    else if(s.i===2&&Math.random()<.5){own=pick(['jeho','její']);hint=`владелец — ${own==='jeho'?'он':'она'}, другой человек`}
+    else{const o=pick(['já','ty','my','vy','oni'].filter(p=>PR_I[p]!==s.i));own=OWN[o];hint=`владелец — ${OWN_RU[o]}`}
+    const sw=poss('svůj',k,N.g).split('/')[0],ow=poss(own,k,N.g).split('/')[0],vf=forms(v,s.i)[0];
+    return choice(`${fr.replace('{V}',s.t?s.t+' '+vf:cap(vf))} (${hint})`,[sw,ow],self?sw:ow,self?'Владелец — подлежащее этого предложения → svůj.':'Владелец не подлежащее → обычное притяжательное.')}],
+  [1,()=>{const x=pick([['Sára','její','bratr','studujou češtinu'],['Petr','jeho','sestra','jsou doma'],['Jana','její','kamarádka','jdou do kina']]),N=NN[x[2]];
+    return choice(`${x[0]} a ___ ${x[2]} ${x[3]}.`,[poss('svůj','N',N.g).split('/')[0],x[1]],x[1],`Здесь «${x[2]}» — часть подлежащего, поэтому svůj нельзя.`)}]
+);
+
+const LPL=[['Mluvím o ___.','p'],['Mluvíme o ___.','p'],['Píšu o ___.','p'],['Přemýšlím o ___.','top2'],['Čteme o ___ v Česku.','city2'],['Rád sedím v ___.','caf'],
+  ['V ___ nic není.','box'],['V těch ___ bydlí hodně lidí.','house'],['Byli jsme na ___.','hory']];
+const LPL_N={top2:['film','kniha','test','úkol','zkouška'],city2:['město','vesnice'],caf:['kavárna','park','restaurace'],box:['pokoj','skříň','taška'],house:['dům'],hory:['hora']};
+const lplPeople=()=>persons().filter(x=>!['pán','manžel','manželka','matka','otec','člověk'].includes(x.nom));
+G.l11r2=R(
+  [5,()=>{const [f,k]=pick(LPL),n=k==='p'?pick(lplPeople()):NN[pick(LPL_N[k])],w=n.f.L2[0],q=f.replace(/^V ___/,cap(vVe(w))+' ___').replace(/ v ___/,' '+vVe(w)+' ___');
+    return write(`${q} (${n.nom} — pl.)`,n.f.L2,'L pl: M и Neu -ech (-ích), F -ách, мягкие -ích.')}],
+  [2,()=>{const n=pick(lplPeople()),m=Math.random()<.5?{d:1}:{a:pick(adjsFor(n).length?adjsFor(n):['nový'])};return write(`Mluvíme o ___. (${nom(n,m,1)})`,phrase(n,'L2',m))}],
+  [1,()=>{const x=pick([['děti','dětech'],['lidé','lidech']]);return write(`${pick(['Mluvíme o','Píšu o','Často mluvím o'])} ___. (${x[0]})`,x[1])}]
+);
+
+const CAUSE=[{c:'venku je hezky',e:'pojedeme na výlet'},{c:'prší',e:'nepůjdu ven'},{c:'mají malé dítě',e:'Irena je doma',ep:'je Irena doma'},{c:'zítra píšu test',e:'musím se učit',ep:'se musím učit'},
+  {c:'je mi špatně',e:'nepůjdu do školy'},{c:'už nemáme chleba',e:'musíme jít nakoupit'},{c:'jsem unavený',e:'jdu spát'},{c:'nemám čas',e:'nemůžu přijít'},{c:'je zima',e:'potřebuju nový kabát'},
+  {c:'mám hlad',e:'dám si něco k jídlu',ep:'si dám něco k jídlu'},{c:'autobus nejede',e:'musím jít pěšky'},{c:'Petr bydlí v Praze deset let',cp:'bydlí v Praze deset let',e:'Petr mluví dobře česky',ep:'mluví dobře česky'}];
+G.l11r3=R(
+  [3,()=>{const x=pick(CAUSE);return choice(`${cap(x.c)}, ___ ${x.ep||x.e}.`,['proto','protože'],'proto','proto — поэтому: дальше следствие.',true)}],
+  [3,()=>{const x=pick(CAUSE);return choice(`${cap(x.e)}, ___ ${x.cp||x.c}.`,['proto','protože'],'protože','protože — потому что: дальше причина.',true)}],
+  [1,()=>{const x=pick(CAUSE.filter(y=>y.e.split(' ').length<4));return order(`${cap(x.c)}, proto ${x.ep||x.e}.`)}]
+);
+
+// ================= LEKCE 12 =================
+G.l12r0=R(
+  [6,()=>{const f=pick([['Telefonuju ___.',['p']],['Pomáhám ___.',['p']],['Blahopřeju ___.',['p']],['Řekl jsi to ___?',['p']],['Poděkuju ___.',['p']],['Nerozumím těm ___.',['t2']]]),
+      n=f[1][0]==='t2'?NN[pick(['věta','slovo','otázka','text'].filter(x=>NN[x]))]:pick(persons().filter(x=>!['pán','manžel','manželka','matka','otec'].includes(x.nom)));
+    return write(`${f[0]} (${n.nom} — pl.)`,n.f.D2,'D pl: M и Neu -ům, F -ám, мягкие -ím.')}],
+  [2,()=>{const n=pick(persons().filter(x=>['kamarád','soused','kamarádka','spolužák','přítel','sestra','bratr'].includes(x.nom))),f=n.f.D2[0];return write(`${pick(['Půjdu','Jedeme','Jdu'])} ${kKe(f)} ___. (${n.nom} — pl.)`,n.f.D2)}],
+  [1,()=>{const x=pick(['děti','lidé']);return write(`${pick(['Musím to říct','Pomáhám','Rozumím'])} ___. (${x})`,x==='děti'?'dětem':'lidem')}],
+  [1,()=>{const n=pick(persons().filter(x=>['student','učitel','soused','kamarádka','spolužák'].includes(x.nom))),m={d:1,a:'nový'};return write(`Pomáháme ___. (${nom(n,m,1)})`,phrase(n,'D2',m))}]
+);
+
+G.l12r1=R(
+  [6,()=>{const f=pick(['Kdy se sejdeš {s} ___?','Mluvili jsme {s} ___.','Setkal jsem se s těmi ___.','Rád mluvím {s} ___.','Jedu tam {s} ___.']),
+      n=pick(persons().filter(x=>!['pán','manžel','manželka','matka','otec','člověk','dítě'].includes(x.nom))),w=n.f.I2[0];
+    return write(`${f.replace('{s}',sSe(w))} (${n.nom} — pl.)`,n.f.I2,'I pl: M -y / -i, F -ami / -emi, Neu -y.')}],
+  [2,()=>{const x=pick([['Pod ___ máme park.','okno'],['Jsem spokojená s ___.','učebnice'],['Jsem spokojený s ___.','kniha'],['Před ___ stojí auta.','dům'],['Mezi ___ je park.','dům']]),n=NN[x[1]];
+    return write(`${x[0].replace('s ___',sSe(n.f.I2[0])+' ___')} (${n.nom} — pl.)`,n.f.I2)}],
+  [1,()=>{const x=pick(['děti','lidé']);return write(`${pick(['Jedu tam s','Rád mluvím s','Pracuju s'])} ___. (${x})`,x==='děti'?'dětmi':'lidmi')}]
+);
+
+const JESTLI_M=['Nevím','Zeptám se','Nevíš','Musíme se podívat','Zjistím','Zeptej se ho'],ZE_M=['Vím','Myslím','Petr říká','Jsem rád','Jana říká'];
+// clauses in the present; with a future one «až» and «když» would also be right
+const CLAUSE=['je tady volno','ten vlak jede i v neděli','má Petr čas','mluví česky','je doma','je ta restaurace otevřená','tady bydlí','umí plavat'],CLAUSE_F=['k vám dneska přijdu','bude zítra hezky','přijde Petr včas'];
+G.l12r2=R(
+  [3,()=>{const m=pick(JESTLI_M),q=m==='Nevíš'?'?':'.',f=Math.random()<.3,c=pick(f?CLAUSE_F:CLAUSE);
+    return choice(`${m}, ___ ${c}${q}`,f?['že','jestli']:Math.random()<.5?['že','jestli','když']:['jestli','až'],'jestli','Косвенный вопрос «ли» — jestli.')}],
+  [2,()=>{const m=pick(ZE_M),c=pick(CLAUSE.filter(x=>x!=='k vám dneska přijdu'||m!=='Jsem rád'));return choice(`${m}, ___ ${c}.`,['jestli','že'],'že','Утверждение — že.',true)}],
+  [1,()=>{const x=pick([['Nevím, jestli půjdu zítra do školy.',['Nevím, jestli zítra půjdu do školy.']],['Nevím, jestli má čas.',[]],['Zeptám se, jestli je tady volno.',[]],['Nevíš, jestli je doma?',[]],['Nevím, jestli přijde Petr.',['Nevím, jestli Petr přijde.']]]);
+    return order(x[0],x[1])}]
+);
+
+const AZ=[['budu mít čas','zavolám ti'],['skončí vyučování','půjdeme na oběd'],['budeme mít dovolenou','pojedeme lyžovat'],['se naobědvám','půjdu na procházku'],['přijdu domů','uvařím večeři'],
+  ['dopíšu úkol','půjdu ven'],['bude hezky','pojedeme na výlet'],['skončí film','půjdeme spát'],['přijede babička','pojedeme do zoo']];
+const AZ_T=[['Radek','skončí v práci','půjde na fotbal'],['Eva','přijde domů','uvaří večeři'],['Petr','dostane výplatu','koupí si nové kolo'],['Jana','skončí ve škole','pojede k babičce']];
+G.l12r3=R(
+  [2,()=>{const [a,b]=pick(AZ);return choice(`___ ${a}, ${b}.`,['Když','Až'],'Až','О будущем «когда» — až.',true)}],
+  [2,()=>{const [a,b]=pick(AZ);return choice(`${cap(b)}, ___ ${a}.`,['když','až'],'až','О будущем «когда» — až (když с будущим значит скорее «если»).',true)}],
+  [2,()=>{const [a,b]=pick(KDYZ);return choice(`___ ${a}, ${b}.`,['Když','Až'],'Když','О настоящем и прошлом — když.',true)}],
+  [1,()=>{const [a,b]=pick(AZ);return order(`Až ${a}, ${b}.`)}],
+  [1,()=>{const [s,a,b]=pick(AZ_T);return write(`${s} ${a}. Potom ${b}. → ___ ${s} ${a}, ${b}.`,'Až')}]
+);
+
+const ALE=[['Dneska budu vařit já','zítra uvaříš ty'],['Mám čas','nemám peníze'],['Ten byt je hezký','je moc drahý'],['Chtěl jsem přijít','nemohl jsem'],['Rozumím česky','mluvím špatně']];
+const I_P=[['Helena má ráda','pivo','víno'],['Petr umí','česky','anglicky'],['Máme doma','psa','kočku'],['Na snídani jím','rohlík','jogurt']];
+G.l12r4=R(
+  [1,()=>{const m=pick(['Vím','Myslím','Dana říkala','Petr říká']),c=pick(ZE_N);return choice(`${m}, ___ ${c}.`,['že','jestli','až'],'že','že — что (утверждение).')}],
+  [1,()=>{const m=pick(JESTLI_M),c=pick(CLAUSE);return choice(`${m}, ___ ${c}.`,['že','jestli','když'],'jestli','jestli — ли (косвенный вопрос).')}],
+  [1,()=>{const [a,b]=pick(KDYZ);return choice(`___ ${a}, ${b}.`,['Až','Když','Jestli'],'Když','když — когда (сейчас, в прошлом).')}],
+  [1,()=>{const [a,b]=pick(AZ);return choice(`___ ${a}, ${b}.`,['Až','Že','Proto'],'Až','až — когда (в будущем).')}],
+  [1,()=>{const x=pick(CAUSE);return choice(`${cap(x.c)}, ___ ${x.ep||x.e}.`,['protože','proto','jestli'],'proto','proto — поэтому.')}],
+  [1,()=>{const x=pick(CAUSE);return choice(`${cap(x.e)}, ___ ${x.cp||x.c}.`,['proto','protože','až'],'protože','protože — потому что.')}],
+  [1,()=>{const [a,b]=pick(ALE);return choice(`${a}, ___ ${b}.`,['ale','protože','jestli'],'ale','ale — но (противопоставление).')}],
+  [1,()=>{const [a,b,c]=pick(I_P);return choice(`${a} ${b} ___ ${c}.`,['i','proto','až'],'i','i — и (тоже).')}]
+);
+
+return G;
+})();
 </script>
 <script>
 // Words: one entry per line, "czech | russian"
@@ -3050,9 +4512,9 @@ const Grammar=(()=>{
     const mix=el('section','mix');mix.hidden=true;mix.setAttribute('aria-labelledby','mix-h');
     mixb.addEventListener('click',()=>{
       mix.hidden=false;
-      const set=pickMix(L),c=[0,0,0];set.forEach(o=>c[o.k]++);
-      const has=[c[0]&&`с прошлой ошибкой ${c[0]}`,c[1]&&`нерешённых ${c[1]}`,c[2]&&`для повторения ${c[2]}`].filter(Boolean).join(', ');
-      mix.innerHTML=`<h2 id="mix-h" tabindex="-1">Смешанная тренировка</h2><p>${set.length} ${plural(set.length,['задание','задания','заданий'])} из всех правил урока. Сначала идут задания, где была ошибка, потом нерешённые, потом решённые давно. Правила перемешаны, чтобы учиться узнавать, какое из них нужно. В этом наборе: ${has}. Нажмите кнопку ещё раз, чтобы получить новый набор.</p>`;
+      const set=pickMix(L),c=[0,0,0,0];set.forEach(o=>c[o.k]++);
+      const has=[c[0]&&`с прошлой ошибкой ${c[0]}`,c[1]&&`нерешённых ${c[1]}`,c[2]&&`для повторения ${c[2]}`,c[3]&&`новых по решённым правилам ${c[3]}`].filter(Boolean).join(', ');
+      mix.innerHTML=`<h2 id="mix-h" tabindex="-1">Смешанная тренировка</h2><p>${set.length} ${plural(set.length,['задание','задания','заданий'])} из всех правил урока. Сначала идут задания, где была ошибка, потом нерешённые, потом новые задания по правилам, где всё решено. Правила перемешаны, чтобы учиться узнавать, какое из них нужно. В этом наборе: ${has}. Нажмите кнопку ещё раз, чтобы получить новый набор.</p>`;
       const items=el('div','items');
       set.forEach((o,i)=>items.appendChild(renderItem(o.x,i+1,'mix-',true)));
       mix.appendChild(items);
@@ -3071,18 +4533,60 @@ const Grammar=(()=>{
         w.replaceChild(renderItems(r),$('.items',w));
         refreshProgress();announce('Упражнения правила сброшены');
       });
-      w.append(h,renderItems(r));s.appendChild(w);panel.appendChild(s);
+      w.append(h,renderItems(r));if(genOK(r))w.appendChild(genBar(r));s.appendChild(w);panel.appendChild(s);
     });
   }
   function renderItems(r){const it=el('div','items');r.ex.forEach((x,i)=>it.appendChild(renderItem(x,i+1,'')));return it}
   // 12 exercises, weakest first: a mistake last time, then never tried, then solved longest ago.
   // Neighbours come from different rules where possible, so each task starts with "which rule is this?"
+  // A task solved right last time comes back as a new one of its rule, so the review never repeats itself.
   function pickMix(L){
-    const all=shuffle(L.rules.flatMap(r=>r.ex.filter(x=>x.t!=='m').map(x=>{const g=glog[x.id];return {x,r:r.id,k:g?(g[0]?2:0):done.has(x.id)?2:1,d:g?g[1]:-1}})));
+    const all=shuffle(L.rules.flatMap(r=>r.ex.filter(x=>x.t!=='m').map(x=>{const g=glog[x.id];return {x,r,k:g?(g[0]?2:0):done.has(x.id)?2:1,d:g?g[1]:-1}})));
     all.sort((a,b)=>a.k-b.k||a.d-b.d);
     const pool=all.slice(0,12),out=[];
     while(pool.length){let i=pool.findIndex(o=>!out.length||o.r!==out[out.length-1].r);if(i<0)i=0;out.push(pool.splice(i,1)[0])}
+    out.forEach(o=>{if(o.k!==2||!genOK(o.r))return;const g=genSet(o.r,1,x=>x.t!=='m')[0];if(g){o.x=g;o.k=3}});
     return out;
+  }
+
+  // ---------- «Новые задания»: fresh exercises from the rule's generator ----------
+  // They never count towards the rule's progress and never go to the mistake log.
+  const GEN_N=6;let genSeq=0;
+  const genOK=r=>typeof GEN!=='undefined'&&!!GEN[r.id];
+  // n tasks of one rule, no two alike, and at first no more than two choices with the same options
+  function genSet(r,n,keep){
+    const out=[],seen=new Set(),kinds={};
+    for(let k=0;out.length<n&&k<n*20;k++){
+      const x=GEN[r.id]();if(keep&&!keep(x))continue;
+      // one task per question, so «Znáš ___?» with three names does not fill a set
+      const key=x.t+(x.q||JSON.stringify(x.a||x.p));if(seen.has(key))continue;
+      const kind=x.t==='c'?x.o.slice().sort().join('|'):x.t;
+      if(x.t==='c'&&(kinds[kind]||0)>=2&&k<n*10)continue;
+      seen.add(key);kinds[kind]=(kinds[kind]||0)+1;
+      x.id=`${r.id}n${genSeq++}`;x.gen=1;out.push(x);
+    }
+    return out;
+  }
+  function genBar(r){
+    const bar=el('div','gbar gnew');
+    bar.innerHTML=`<p><b>Новые задания.</b> Каждый раз другие слова и формы. В счёт урока не идут.</p><button type="button" class="btn sm">Дать задания</button>`;
+    $('button',bar).addEventListener('click',()=>{const p=genPanel(r);bar.replaceWith(p);$('h3',p).focus({preventScroll:true})});
+    return bar;
+  }
+  function genPanel(r){
+    const p=el('section','gnewp');p.setAttribute('aria-labelledby',`gen-${r.id}-h`);
+    p.innerHTML=`<div class="exhead"><h3 id="gen-${r.id}-h" tabindex="-1">Новые задания</h3><span class="exmeta"><span class="score"></span><button type="button" class="linkbtn" data-a="close">Свернуть</button></span></div><div class="items"></div><div class="row"><button type="button" class="btn sm" data-a="more">Другие задания</button></div>`;
+    let n=0,right=0;const met=new Set();
+    const score=()=>{$('.score',p).textContent=met.size?`с первого раза верно ${right} из ${n}`:''};
+    const fill=()=>{const set=genSet(r,GEN_N),it=$('.items',p);n=set.length;right=0;met.clear();it.innerHTML='';set.forEach((x,i)=>it.appendChild(renderItem(x,i+1,'gen-',true)));score()};
+    // the first answer in each card; «Ещё раз» gives the same task again and does not count twice
+    p.addEventListener('first',e=>{if(met.has(e.detail.id))return;met.add(e.detail.id);if(e.detail.ok)right++;score()});
+    p.addEventListener('click',e=>{
+      const b=e.target.closest('[data-a]');if(!b)return;
+      if(b.dataset.a==='close'){const g=genBar(r);p.replaceWith(g);$('button',g).focus({preventScroll:true});return}
+      fill();const f=$('.item input,.item .opt,.item .chip,.item .mbtn',p);if(f)f.focus({preventScroll:true});announce('Новые задания готовы');
+    });
+    fill();return p;
   }
   function refresh(){
     if(!cur||!root||!root.isConnected)return;
@@ -3184,10 +4688,10 @@ const Grammar=(()=>{
     if(!guide&&!fresh&&done.has(x.id)&&!weak)return renderSolved(x,num,pfx,card,body);
     // the first answer given in this card goes to the log the mixed training reads
     let first=true;
-    const rid=x.id.replace(/[xg]\d+$/,'');
+    const rid=x.id.replace(/[xgn]\d+$/,'');
     const res=(ok,firstOk=ok)=>{
-      if(first){first=false;if(!guide){logEx(x.id,firstOk);refresh()}}
-      mark(x,card,ok,!guide);
+      if(first){first=false;if(x.gen)card.dispatchEvent(new CustomEvent('first',{bubbles:true,detail:{id:x.id,ok:firstOk}}));else if(!guide){logEx(x.id,firstOk);refresh()}}
+      mark(x,card,ok,!guide&&!x.gen);
       // a mistake in a rule that has a walkthrough points to it
       if(!ok&&!guide&&GUIDES[rid]&&!$('.glink',fb)){
         const b=el('button','linkbtn glink','Разобрать правило по шагам');b.type='button';
@@ -3241,14 +4745,17 @@ const Grammar=(()=>{
     }
 
     if(x.t==='o'){
-      const words=x.a.split(' ');
+      // with another right order (alt) the final stop is not on a chip, so any last word can end the sentence
+      const words=(x.alt?x.a.replace(/[.!?]$/,''):x.a).split(' ');
       let order=shuffle(words.map((w,i)=>i));
       if(words.length>1)while(order.every((v,i)=>v===i))order=shuffle(order);
       const ans=el('div','chips'),pool=el('div','chips pool');
       ans.setAttribute('aria-label','Ваш ответ');pool.setAttribute('aria-label','Слова для ответа');
       const picked=[];
+      const bare=s=>norm(s).replace(/[.,!?]/g,'');
       const check=()=>{
-        if(norm(picked.map(i=>words[i]).join(' '))===norm(x.a)){fb.className='fb ok';fb.innerHTML=`${ICON.check}Верно: <i>${esc(x.a)}</i>${extra()}`;res(true)}
+        const got=bare(picked.map(i=>words[i]).join(' ')),hit=[x.a,...(x.alt||[])].find(a=>bare(a)===got);
+        if(hit){fb.className='fb ok';fb.innerHTML=`${ICON.check}Верно: <i>${esc(hit)}</i>${extra()}`;res(true)}
         else{fb.className='fb bad';fb.innerHTML='Порядок неверный. Нажмите на слово в ответе, чтобы вернуть его.';res(false)}
       };
       const draw=(focusTo)=>{
